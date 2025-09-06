@@ -3,7 +3,7 @@
  * Plugin Name: AI Events Pro
  * Plugin URI: https://sawahsolutions.com
  * Description: A comprehensive WordPress events plugin with modern features, AI integration, and event aggregation from major APIs.
- * Version: 2.0.12
+ * Version: 2.0.13
  * Author: Mohamed Sawah
  * Author URI: https://sawahsolutions.com
  * License: GPL v2 or later
@@ -21,7 +21,7 @@ if (!defined('WPINC')) {
 }
 
 // Define plugin constants
-define('AI_EVENTS_PRO_VERSION', '2.0.12');
+define('AI_EVENTS_PRO_VERSION', '2.0.13');
 define('AI_EVENTS_PRO_PLUGIN_NAME', 'ai-events-pro');
 define('AI_EVENTS_PRO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AI_EVENTS_PRO_PLUGIN_URL', plugin_dir_url(__FILE__));
