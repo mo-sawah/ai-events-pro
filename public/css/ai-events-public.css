@@ -611,3 +611,19 @@ body.ai-events-theme-dark .aiep {
 .aiep .ae-bubble::before {
   content: none !important;
 }
+
+/* Pin the CTA at the bottom of each card */
+.aiep .aiep-card {
+  display: flex; /* you already have this, safe to repeat */
+  flex-direction: column; /* you already have this, safe to repeat */
+  height: 100%; /* let cards stretch when the grid allows */
+}
+
+.aiep .aiep-card__foot {
+  margin-top: auto; /* push footer to the bottom of the card */
+}
+
+/* Make sure grid items stretch so cards can fill their column */
+.aiep .aiep-grid {
+  align-items: stretch; /* default for grid, but enforce just in case */
+}
