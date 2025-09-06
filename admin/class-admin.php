@@ -29,36 +29,109 @@ class AI_Events_Admin {
         add_action('wp_ajax_delete_shortcode_preset', array($this, 'ajax_delete_shortcode_preset'));
         add_action('wp_ajax_preview_shortcode', array($this, 'ajax_preview_shortcode'));
 
-        add_action('admin_init', array($this, 'register_settings'));
+        // Register all settings (General, APIs, AI, and Appearance) on the same Settings page
+        add_action('admin_init', array($this, 'init_settings'));
+
+        // Enqueue admin assets (color picker, etc.)
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
     }
 
     public function enqueue_admin_assets($hook) {
-        // Load WordPress color picker on your settings page
+        // Load WordPress color picker on your plugin pages
         if (strpos($hook, 'ai-events') !== false || strpos($hook, 'ai_events') !== false) {
             wp_enqueue_style('wp-color-picker');
             wp_enqueue_script('wp-color-picker');
         }
     }
 
-    public function register_settings() {
-        register_setting('ai_events_pro_settings_group', 'ai_events_pro_settings');
+    /**
+     * Settings registration (existing + Appearance on the same 'ai_events_pro_general' page)
+     * Hooked via admin_init.
+     */
+    public function init_settings() {
+        // Option groups
+        register_setting('ai_events_pro_general',      'ai_events_pro_settings',              array($this, 'validate_general_settings'));
+        register_setting('ai_events_pro_eventbrite',   'ai_events_pro_eventbrite_settings',   array($this, 'validate_eventbrite_settings'));
+        register_setting('ai_events_pro_ticketmaster', 'ai_events_pro_ticketmaster_settings', array($this, 'validate_ticketmaster_settings'));
+        register_setting('ai_events_pro_ai',           'ai_events_pro_ai_settings',           array($this, 'validate_ai_settings'));
 
-        // Section: Appearance
+        $this->add_settings_sections();
+        $this->add_settings_fields();
+    }
+
+    private function add_settings_sections() {
+        // General page sections
+        add_settings_section(
+            'ai_events_pro_general_section',
+            __('General Settings', 'ai-events-pro'),
+            array($this, 'general_section_callback'),
+            'ai_events_pro_general'
+        );
+
+        // Appearance section on the same General page so it actually renders on your current Settings view
         add_settings_section(
             'ai_events_pro_appearance',
             __('Appearance', 'ai-events-pro'),
             '__return_false',
-            'ai_events_pro_settings'
+            'ai_events_pro_general'
         );
 
-        // Default Theme Mode
+        // Provider sections (other pages)
+        add_settings_section(
+            'ai_events_pro_eventbrite_section',
+            __('Eventbrite API Configuration', 'ai-events-pro'),
+            array($this, 'eventbrite_section_callback'),
+            'ai_events_pro_eventbrite'
+        );
+
+        add_settings_section(
+            'ai_events_pro_ticketmaster_section',
+            __('Ticketmaster API Configuration', 'ai-events-pro'),
+            array($this, 'ticketmaster_section_callback'),
+            'ai_events_pro_ticketmaster'
+        );
+
+        add_settings_section(
+            'ai_events_pro_ai_section',
+            __('AI Features Configuration', 'ai-events-pro'),
+            array($this, 'ai_section_callback'),
+            'ai_events_pro_ai'
+        );
+    }
+
+    private function add_settings_fields() {
+        $general_settings      = get_option('ai_events_pro_settings', array());
+        $eventbrite_settings   = get_option('ai_events_pro_eventbrite_settings', array());
+        $ticketmaster_settings = get_option('ai_events_pro_ticketmaster_settings', array());
+        $ai_settings           = get_option('ai_events_pro_ai_settings', array());
+
+        // General
+        add_settings_field('events_per_page', __('Events Per Page', 'ai-events-pro'),
+            array($this, 'number_field_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
+            array('option' => 'ai_events_pro_settings', 'field' => 'events_per_page', 'value' => $general_settings['events_per_page'] ?? 12, 'min' => 1, 'max' => 50));
+
+        add_settings_field('default_radius', __('Default Search Radius (miles)', 'ai-events-pro'),
+            array($this, 'number_field_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
+            array('option' => 'ai_events_pro_settings', 'field' => 'default_radius', 'value' => $general_settings['default_radius'] ?? 25, 'min' => 1, 'max' => 500));
+
+        add_settings_field('cache_duration', __('Cache Duration (hours)', 'ai-events-pro'),
+            array($this, 'number_field_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
+            array('option' => 'ai_events_pro_settings', 'field' => 'cache_duration', 'value' => max(1, intval(($general_settings['cache_duration'] ?? 3600) / 3600)), 'min' => 1, 'max' => 24));
+
+        add_settings_field('enable_geolocation', __('Enable Auto-Location Detection', 'ai-events-pro'),
+            array($this, 'checkbox_field_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
+            array('option' => 'ai_events_pro_settings', 'field' => 'enable_geolocation', 'value' => !empty($general_settings['enable_geolocation'])));
+
+        add_settings_field('enabled_apis', __('Enabled Event Sources', 'ai-events-pro'),
+            array($this, 'api_selection_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
+            array('option' => 'ai_events_pro_settings', 'value' => $general_settings));
+
+        // Appearance (on General page)
         add_settings_field(
             'default_theme_mode',
             __('Default Theme Mode', 'ai-events-pro'),
-            function () {
-                $s = get_option('ai_events_pro_settings', array());
-                $val = isset($s['default_theme_mode']) ? $s['default_theme_mode'] : 'auto';
+            function () use ($general_settings) {
+                $val = isset($general_settings['default_theme_mode']) ? $general_settings['default_theme_mode'] : 'auto';
                 ?>
                 <select name="ai_events_pro_settings[default_theme_mode]">
                     <option value="auto"  <?php selected($val, 'auto');  ?>><?php _e('Auto (Follow system)', 'ai-events-pro'); ?></option>
@@ -67,29 +140,73 @@ class AI_Events_Admin {
                 </select>
                 <?php
             },
-            'ai_events_pro_settings',
+            'ai_events_pro_general',
             'ai_events_pro_appearance'
         );
 
-        // Colors (Light)
         add_settings_field(
             'colors_light',
             __('Colors (Light Mode)', 'ai-events-pro'),
             array($this, 'render_colors_light'),
-            'ai_events_pro_settings',
+            'ai_events_pro_general',
             'ai_events_pro_appearance'
         );
 
-        // Colors (Dark)
         add_settings_field(
             'colors_dark',
             __('Colors (Dark Mode)', 'ai-events-pro'),
             array($this, 'render_colors_dark'),
-            'ai_events_pro_settings',
+            'ai_events_pro_general',
             'ai_events_pro_appearance'
         );
+
+        // Eventbrite
+        add_settings_field('eventbrite_private_token', __('Private Token', 'ai-events-pro'),
+            array($this, 'password_field_callback'), 'ai_events_pro_eventbrite', 'ai_events_pro_eventbrite_section',
+            array(
+                'option'      => 'ai_events_pro_eventbrite_settings',
+                'field'       => 'private_token',
+                'value'       => $eventbrite_settings['private_token'] ?? '',
+                'description' => __('Your Eventbrite Private Token (Personal OAuth token)', 'ai-events-pro'),
+                'api_type'    => 'eventbrite'
+            ));
+
+        // Ticketmaster
+        add_settings_field('ticketmaster_consumer_key', __('Consumer Key (API Key)', 'ai-events-pro'),
+            array($this, 'password_field_callback'), 'ai_events_pro_ticketmaster', 'ai_events_pro_ticketmaster_section',
+            array(
+                'option'      => 'ai_events_pro_ticketmaster_settings',
+                'field'       => 'consumer_key',
+                'value'       => $ticketmaster_settings['consumer_key'] ?? '',
+                'description' => __('Your Ticketmaster Consumer Key from Developer Portal', 'ai-events-pro'),
+                'api_type'    => 'ticketmaster'
+            ));
+
+        // AI
+        add_settings_field('enable_ai_features', __('Enable AI Features', 'ai-events-pro'),
+            array($this, 'checkbox_field_callback'), 'ai_events_pro_ai', 'ai_events_pro_ai_section',
+            array('option' => 'ai_events_pro_ai_settings', 'field' => 'enable_ai_features', 'value' => !empty($ai_settings['enable_ai_features'])));
+
+        add_settings_field('openrouter_api_key', __('OpenRouter API Key', 'ai-events-pro'),
+            array($this, 'password_field_callback'), 'ai_events_pro_ai', 'ai_events_pro_ai_section',
+            array(
+                'option'      => 'ai_events_pro_ai_settings',
+                'field'       => 'openrouter_api_key',
+                'value'       => $ai_settings['openrouter_api_key'] ?? '',
+                'description' => __('Required for AI features like categorization and summaries', 'ai-events-pro'),
+                'api_type'    => 'openrouter'
+            ));
+
+        add_settings_field('ai_categorization', __('AI Event Categorization', 'ai-events-pro'),
+            array($this, 'checkbox_field_callback'), 'ai_events_pro_ai', 'ai_events_pro_ai_section',
+            array('option' => 'ai_events_pro_ai_settings', 'field' => 'ai_categorization', 'value' => !empty($ai_settings['ai_categorization'])));
+
+        add_settings_field('ai_summaries', __('AI Event Summaries', 'ai-events-pro'),
+            array($this, 'checkbox_field_callback'), 'ai_events_pro_ai', 'ai_events_pro_ai_section',
+            array('option' => 'ai_events_pro_ai_settings', 'field' => 'ai_summaries', 'value' => !empty($ai_settings['ai_summaries'])));
     }
 
+    // Helpers for color fields
     private function color_input($name, $label, $value, $fallback) {
         $val = $value ?: $fallback;
         ?>
@@ -289,123 +406,6 @@ class AI_Events_Admin {
         exit;
     }
 
-    /**
-     * Settings registration (kept from your current class)
-     * Hook via admin_init in your loader.
-     */
-    public function init_settings() {
-        register_setting('ai_events_pro_general',      'ai_events_pro_settings',              array($this, 'validate_general_settings'));
-        register_setting('ai_events_pro_eventbrite',   'ai_events_pro_eventbrite_settings',   array($this, 'validate_eventbrite_settings'));
-        register_setting('ai_events_pro_ticketmaster', 'ai_events_pro_ticketmaster_settings', array($this, 'validate_ticketmaster_settings'));
-        register_setting('ai_events_pro_ai',           'ai_events_pro_ai_settings',           array($this, 'validate_ai_settings'));
-
-        $this->add_settings_sections();
-        $this->add_settings_fields();
-    }
-
-    private function add_settings_sections() {
-        add_settings_section(
-            'ai_events_pro_general_section',
-            __('General Settings', 'ai-events-pro'),
-            array($this, 'general_section_callback'),
-            'ai_events_pro_general'
-        );
-
-        add_settings_section(
-            'ai_events_pro_eventbrite_section',
-            __('Eventbrite API Configuration', 'ai-events-pro'),
-            array($this, 'eventbrite_section_callback'),
-            'ai_events_pro_eventbrite'
-        );
-
-        add_settings_section(
-            'ai_events_pro_ticketmaster_section',
-            __('Ticketmaster API Configuration', 'ai-events-pro'),
-            array($this, 'ticketmaster_section_callback'),
-            'ai_events_pro_ticketmaster'
-        );
-
-        add_settings_section(
-            'ai_events_pro_ai_section',
-            __('AI Features Configuration', 'ai-events-pro'),
-            array($this, 'ai_section_callback'),
-            'ai_events_pro_ai'
-        );
-    }
-
-    private function add_settings_fields() {
-        $general_settings      = get_option('ai_events_pro_settings', array());
-        $eventbrite_settings   = get_option('ai_events_pro_eventbrite_settings', array());
-        $ticketmaster_settings = get_option('ai_events_pro_ticketmaster_settings', array());
-        $ai_settings           = get_option('ai_events_pro_ai_settings', array());
-
-        // General
-        add_settings_field('events_per_page', __('Events Per Page', 'ai-events-pro'),
-            array($this, 'number_field_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
-            array('option' => 'ai_events_pro_settings', 'field' => 'events_per_page', 'value' => $general_settings['events_per_page'] ?? 12, 'min' => 1, 'max' => 50));
-
-        add_settings_field('default_radius', __('Default Search Radius (miles)', 'ai-events-pro'),
-            array($this, 'number_field_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
-            array('option' => 'ai_events_pro_settings', 'field' => 'default_radius', 'value' => $general_settings['default_radius'] ?? 25, 'min' => 1, 'max' => 500));
-
-        add_settings_field('cache_duration', __('Cache Duration (hours)', 'ai-events-pro'),
-            array($this, 'number_field_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
-            array('option' => 'ai_events_pro_settings', 'field' => 'cache_duration', 'value' => max(1, intval(($general_settings['cache_duration'] ?? 3600) / 3600)), 'min' => 1, 'max' => 24));
-
-        add_settings_field('enable_geolocation', __('Enable Auto-Location Detection', 'ai-events-pro'),
-            array($this, 'checkbox_field_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
-            array('option' => 'ai_events_pro_settings', 'field' => 'enable_geolocation', 'value' => !empty($general_settings['enable_geolocation'])));
-
-        add_settings_field('enabled_apis', __('Enabled Event Sources', 'ai-events-pro'),
-            array($this, 'api_selection_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
-            array('option' => 'ai_events_pro_settings', 'value' => $general_settings));
-
-        // Eventbrite
-        add_settings_field('eventbrite_private_token', __('Private Token', 'ai-events-pro'),
-            array($this, 'password_field_callback'), 'ai_events_pro_eventbrite', 'ai_events_pro_eventbrite_section',
-            array(
-                'option'      => 'ai_events_pro_eventbrite_settings',
-                'field'       => 'private_token',
-                'value'       => $eventbrite_settings['private_token'] ?? '',
-                'description' => __('Your Eventbrite Private Token (Personal OAuth token)', 'ai-events-pro'),
-                'api_type'    => 'eventbrite'
-            ));
-
-        // Ticketmaster
-        add_settings_field('ticketmaster_consumer_key', __('Consumer Key (API Key)', 'ai-events-pro'),
-            array($this, 'password_field_callback'), 'ai_events_pro_ticketmaster', 'ai_events_pro_ticketmaster_section',
-            array(
-                'option'      => 'ai_events_pro_ticketmaster_settings',
-                'field'       => 'consumer_key',
-                'value'       => $ticketmaster_settings['consumer_key'] ?? '',
-                'description' => __('Your Ticketmaster Consumer Key from Developer Portal', 'ai-events-pro'),
-                'api_type'    => 'ticketmaster'
-            ));
-
-        // AI
-        add_settings_field('enable_ai_features', __('Enable AI Features', 'ai-events-pro'),
-            array($this, 'checkbox_field_callback'), 'ai_events_pro_ai', 'ai_events_pro_ai_section',
-            array('option' => 'ai_events_pro_ai_settings', 'field' => 'enable_ai_features', 'value' => !empty($ai_settings['enable_ai_features'])));
-
-        add_settings_field('openrouter_api_key', __('OpenRouter API Key', 'ai-events-pro'),
-            array($this, 'password_field_callback'), 'ai_events_pro_ai', 'ai_events_pro_ai_section',
-            array(
-                'option'      => 'ai_events_pro_ai_settings',
-                'field'       => 'openrouter_api_key',
-                'value'       => $ai_settings['openrouter_api_key'] ?? '',
-                'description' => __('Required for AI features like categorization and summaries', 'ai-events-pro'),
-                'api_type'    => 'openrouter'
-            ));
-
-        add_settings_field('ai_categorization', __('AI Event Categorization', 'ai-events-pro'),
-            array($this, 'checkbox_field_callback'), 'ai_events_pro_ai', 'ai_events_pro_ai_section',
-            array('option' => 'ai_events_pro_ai_settings', 'field' => 'ai_categorization', 'value' => !empty($ai_settings['ai_categorization'])));
-
-        add_settings_field('ai_summaries', __('AI Event Summaries', 'ai-events-pro'),
-            array($this, 'checkbox_field_callback'), 'ai_events_pro_ai', 'ai_events_pro_ai_section',
-            array('option' => 'ai_events_pro_ai_settings', 'field' => 'ai_summaries', 'value' => !empty($ai_settings['ai_summaries'])));
-    }
-
     // Settings callbacks
     public function general_section_callback() {
         echo '<p>' . esc_html__('Configure general plugin settings and choose which event sources to enable.', 'ai-events-pro') . '</p>';
@@ -492,11 +492,14 @@ class AI_Events_Admin {
     // Validation
     public function validate_general_settings($input) {
         $out = array();
-        $out['events_per_page']    = max(1, min(50, absint($input['events_per_page'] ?? 12)));
-        $out['default_radius']     = max(1, min(500, absint($input['default_radius'] ?? 25)));
-        $out['cache_duration']     = max(1, absint($input['cache_duration'] ?? 1)) * 3600;
-        $out['enable_geolocation'] = !empty($input['enable_geolocation']);
-        $out['enabled_apis']       = array();
+        $out['events_per_page']      = max(1, min(50, absint($input['events_per_page'] ?? 12)));
+        $out['default_radius']       = max(1, min(500, absint($input['default_radius'] ?? 25)));
+        $out['cache_duration']       = max(1, absint($input['cache_duration'] ?? 1)) * 3600;
+        $out['enable_geolocation']   = !empty($input['enable_geolocation']);
+        $out['default_theme_mode']   = in_array(($input['default_theme_mode'] ?? 'auto'), array('auto','light','dark'), true) ? $input['default_theme_mode'] : 'auto';
+        $out['colors_light']         = is_array($input['colors_light'] ?? null) ? array_map('sanitize_text_field', $input['colors_light']) : array();
+        $out['colors_dark']          = is_array($input['colors_dark'] ?? null) ? array_map('sanitize_text_field', $input['colors_dark']) : array();
+        $out['enabled_apis']         = array();
         if (!empty($input['enabled_apis']) && is_array($input['enabled_apis'])) {
             foreach ($input['enabled_apis'] as $api => $enabled) {
                 $out['enabled_apis'][$api] = !empty($enabled);

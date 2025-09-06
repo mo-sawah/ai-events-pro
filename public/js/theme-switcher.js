@@ -88,7 +88,7 @@
       applyMode(next);
       setCookie("ai_events_theme_mode", next, 30);
 
-      // Optional server notify (will no-op for visitors if action isn’t registered server-side)
+      // Optional server notify
       try {
         if (
           window.ai_events_public &&

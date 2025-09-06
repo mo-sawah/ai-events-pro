@@ -12,12 +12,13 @@ class AI_Events_Public {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
 
-        // Enqueue both styles and scripts on the frontend
+        // Enqueue both styles and scripts
         add_action('wp_enqueue_scripts', array($this, 'enqueue_styles'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
     }
 
     public function enqueue_styles() {
+        // Base UI CSS
         wp_enqueue_style(
             $this->plugin_name,
             AI_EVENTS_PRO_PLUGIN_URL . 'public/css/ai-events-public.css',
@@ -26,6 +27,7 @@ class AI_Events_Public {
             'all'
         );
 
+        // Optional theme modes CSS (if you keep separate)
         wp_enqueue_style(
             $this->plugin_name . '-theme-modes',
             AI_EVENTS_PRO_PLUGIN_URL . 'public/css/theme-modes.css',
@@ -140,32 +142,28 @@ class AI_Events_Public {
         // Try cache first
         $events = $api_manager->get_cached_events($location);
 
-        // If no cache or cache has fewer items than we need to answer this page, fetch fresh
+        // If no cache or not enough cached items for this page, fetch fresh enough to answer
         if (empty($events) || count($events) < $need_count) {
             $fetched = $api_manager->get_events($location, $radius, $need_count);
             if (!empty($fetched)) {
                 $events = $fetched;
-                // Replace/refresh cache so subsequent pages can be served without refetch
                 $api_manager->cache_events($events, $location);
             }
         }
 
-        // If still empty, bail early
         if (empty($events)) {
             wp_send_json_error(__('No events found.', 'ai-events-pro'));
         }
 
-        // Apply filters on the full list we have so far
+        // Apply filters to the items we have
         $filtered = array_values(array_filter($events, function ($event) use ($category, $search, $source) {
 
-            // Source filter
             if (!empty($source) && $source !== 'all') {
                 if (!isset($event['source']) || strtolower($event['source']) !== strtolower($source)) {
                     return false;
                 }
             }
 
-            // Category filter (check both category and ai_category if present)
             if (!empty($category) && $category !== 'all') {
                 $cat1 = isset($event['category']) ? (string)$event['category'] : '';
                 $cat2 = isset($event['ai_category']) ? (string)$event['ai_category'] : '';
@@ -174,7 +172,6 @@ class AI_Events_Public {
                 }
             }
 
-            // Search filter (title + description)
             if (!empty($search)) {
                 $title = isset($event['title']) ? (string)$event['title'] : '';
                 $desc  = isset($event['description']) ? (string)$event['description'] : '';
@@ -186,16 +183,15 @@ class AI_Events_Public {
             return true;
         }));
 
-        // Optionally enhance with AI on the filtered slice we know about
+        // Optional AI enhancement
         $ai_settings = get_option('ai_events_pro_ai_settings', array());
         if (!empty($ai_settings['enable_ai_features']) && !empty($ai_settings['openrouter_api_key'])) {
             $filtered = $api_manager->enhance_with_ai($filtered, $ai_settings);
         }
 
-        // Total filtered events we currently know about (within what we fetched/cached)
         $total_filtered = count($filtered);
 
-        // Slice for current page
+        // Slice for this page
         $page_events = array_slice($filtered, $offset, $limit);
 
         if (!empty($page_events)) {
@@ -205,7 +201,7 @@ class AI_Events_Public {
             }
             $html = ob_get_clean();
 
-            // We fetched one extra, so "has more" is true if our filtered total exceeds the end of this page.
+            // With one extra fetched, "has more" is true if there are more filtered items beyond this page.
             $has_more = ($offset + $limit) < $total_filtered;
 
             wp_send_json_success(array(
@@ -296,7 +292,7 @@ class AI_Events_Public {
         }
 
         $city = $data['city'] ?? '';
-        $region = $data['region'] ?? ($data['region_code'] ?? '');
+               $region = $data['region'] ?? ($data['region_code'] ?? '');
 
         if (!empty($city) && !empty($region)) {
             return $city . ', ' . $region;
