@@ -1,6 +1,6 @@
 <?php
 /**
- * Fixed Settings Page with separate forms
+ * Complete Settings Page with debug panel and separate forms
  */
 
 if (!current_user_can('manage_options')) {
@@ -80,6 +80,26 @@ settings_errors('ai_events_pro_messages');
         <div class="sync-events-section">
             <h3><?php _e('Sync Events', 'ai-events-pro'); ?></h3>
             
+            <!-- Debug Panel -->
+            <div class="debug-panel">
+                <h4><?php _e('Debug Information', 'ai-events-pro'); ?></h4>
+                <div class="debug-actions">
+                    <button type="button" id="show-debug-btn" class="button">
+                        <?php _e('Show Debug Info', 'ai-events-pro'); ?>
+                    </button>
+                    <button type="button" id="clear-debug-btn" class="button">
+                        <?php _e('Clear Debug Log', 'ai-events-pro'); ?>
+                    </button>
+                </div>
+                <div id="debug-info" style="display: none;">
+                    <h5>Current Settings Status:</h5>
+                    <div id="settings-status"></div>
+                    
+                    <h5>Recent Debug Log:</h5>
+                    <div id="debug-log"></div>
+                </div>
+            </div>
+            
             <!-- API Status Check -->
             <div class="api-status-check">
                 <h4><?php _e('API Status', 'ai-events-pro'); ?></h4>
@@ -107,6 +127,13 @@ settings_errors('ai_events_pro_messages');
                     </div>
                     <?php endif; ?>
                     
+                    <?php if (!empty($enabled_apis['custom'])): ?>
+                    <div class="api-status-item">
+                        <span class="status-dot connected"></span>
+                        <span>Custom Events: <?php _e('Always Ready', 'ai-events-pro'); ?></span>
+                    </div>
+                    <?php endif; ?>
+                    
                     <?php if (!empty($ai_settings['enable_ai_features'])): ?>
                     <div class="api-status-item">
                         <span class="status-dot <?php echo !empty($ai_settings['openrouter_api_key']) ? 'connected' : 'disconnected'; ?>"></span>
@@ -117,172 +144,461 @@ settings_errors('ai_events_pro_messages');
             </div>
             
             <!-- Sync Form -->
-            <div class="sync-form">
+            <div class="sync-form-section">
+                <h4><?php _e('Manual Event Sync', 'ai-events-pro'); ?></h4>
                 <table class="form-table">
                     <tr>
-                        <th><label for="sync_location"><?php _e('Location', 'ai-events-pro'); ?></label></th>
+                        <th scope="row">
+                            <label for="sync_location"><?php _e('Location', 'ai-events-pro'); ?></label>
+                        </th>
                         <td>
-                            <input type="text" id="sync_location" class="regular-text" placeholder="<?php _e('New York, NY', 'ai-events-pro'); ?>" />
-                            <p class="description"><?php _e('Enter a city and state to find events.', 'ai-events-pro'); ?></p>
+                            <input type="text" id="sync_location" name="sync_location" value="" class="regular-text" 
+                                   placeholder="<?php _e('e.g., New York, NY', 'ai-events-pro'); ?>" required />
+                            <p class="description"><?php _e('Enter a city, state, or specific location to find events nearby.', 'ai-events-pro'); ?></p>
                         </td>
                     </tr>
                     <tr>
-                        <th><label for="sync_radius"><?php _e('Radius (miles)', 'ai-events-pro'); ?></label></th>
-                        <td><input type="number" id="sync_radius" value="25" min="1" max="500" class="small-text" /></td>
+                        <th scope="row">
+                            <label for="sync_radius"><?php _e('Search Radius (miles)', 'ai-events-pro'); ?></label>
+                        </th>
+                        <td>
+                            <select id="sync_radius" name="sync_radius">
+                                <option value="5">5 miles</option>
+                                <option value="10">10 miles</option>
+                                <option value="25" selected>25 miles</option>
+                                <option value="50">50 miles</option>
+                                <option value="100">100 miles</option>
+                                <option value="250">250 miles</option>
+                                <option value="500">500 miles</option>
+                            </select>
+                        </td>
                     </tr>
                     <tr>
-                        <th><label for="sync_limit"><?php _e('Max Events', 'ai-events-pro'); ?></label></th>
-                        <td><input type="number" id="sync_limit" value="50" min="1" max="200" class="small-text" /></td>
+                        <th scope="row">
+                            <label for="sync_limit"><?php _e('Max Events', 'ai-events-pro'); ?></label>
+                        </th>
+                        <td>
+                            <select id="sync_limit" name="sync_limit">
+                                <option value="25">25 events</option>
+                                <option value="50" selected>50 events</option>
+                                <option value="100">100 events</option>
+                                <option value="200">200 events</option>
+                            </select>
+                        </td>
                     </tr>
                 </table>
                 
-                <div class="sync-buttons">
+                <p class="submit">
                     <button type="button" id="sync-events-btn" class="button button-primary">
                         <?php _e('Sync Events Now', 'ai-events-pro'); ?>
                     </button>
                     <button type="button" id="clear-cache-btn" class="button">
                         <?php _e('Clear Cache', 'ai-events-pro'); ?>
                     </button>
-                </div>
+                </p>
                 
-                <div id="sync-results"></div>
+                <div id="sync-results" class="sync-results"></div>
             </div>
         </div>
     </div>
 </div>
 
 <style>
-.nav-tab-wrapper { margin-bottom: 20px; }
-.tab-content { display: none; background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-top: none; }
-.tab-content.active { display: block; }
+.nav-tab-wrapper {
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 20px;
+}
 
-.api-info { background: #f0f8ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
-.api-info ol { margin-left: 20px; }
+.tab-content {
+    display: none;
+    padding: 20px 0;
+}
 
-.api-status-check { margin-bottom: 30px; }
-.api-status-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-.api-status-item { display: flex; align-items: center; gap: 10px; }
-.status-dot { width: 10px; height: 10px; border-radius: 50%; }
-.status-dot.connected { background: #28a745; }
-.status-dot.disconnected { background: #dc3545; }
+.tab-content.active {
+    display: block;
+}
 
-.sync-form .form-table { margin-bottom: 20px; }
-.sync-buttons { margin: 20px 0; }
-.sync-buttons .button { margin-right: 10px; }
+.debug-panel {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
 
-#sync-results { margin-top: 20px; padding: 15px; border-radius: 4px; display: none; }
-#sync-results.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-#sync-results.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+.debug-actions {
+    margin-bottom: 15px;
+}
 
-.ai-features-info { background: #f0f8ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+.debug-actions button {
+    margin-right: 10px;
+}
+
+#debug-log {
+    background: #fff;
+    padding: 10px;
+    border: 1px solid #ccc;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-line;
+}
+
+.api-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.api-status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.connected {
+    background-color: #46b450;
+}
+
+.status-dot.disconnected {
+    background-color: #dc3232;
+}
+
+.sync-results {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.sync-results.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.sync-results.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.sync-success, .sync-error {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+}
+
+.sync-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.sync-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.events-preview {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 4px;
+}
+
+.events-preview h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+}
+
+.events-preview ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.events-preview li {
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+.api-info {
+    background: #e7f3ff;
+    border-left: 4px solid #0073aa;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+.ai-features-info {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin: 15px 0;
+}
+
+details {
+    margin-top: 10px;
+}
+
+summary {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+details ul {
+    margin-top: 10px;
+    padding-left: 20px;
+}
+
+#settings-status table {
+    margin-bottom: 15px;
+}
 </style>
 
 <script>
 jQuery(document).ready(function($) {
     // Tab switching
-    $('.nav-tab').click(function(e) {
+    $('.nav-tab').on('click', function(e) {
         e.preventDefault();
+        
+        var target = $(this).attr('href');
+        
         $('.nav-tab').removeClass('nav-tab-active');
         $(this).addClass('nav-tab-active');
+        
         $('.tab-content').removeClass('active');
-        $($(this).attr('href')).addClass('active');
+        $(target).addClass('active');
+        
+        // Save active tab to localStorage
+        localStorage.setItem('ai-events-active-tab', target);
     });
     
-    // API Testing
-    $('.test-api-btn').click(function() {
-        var $btn = $(this);
-        var apiType = $btn.data('api');
-        var optionName = $btn.data('option');
-        var fieldName = $btn.data('field');
-        var $input = $btn.prev('input');
-        var apiKey = $input.val();
+    // Restore active tab
+    var activeTab = localStorage.getItem('ai-events-active-tab');
+    if (activeTab && $(activeTab).length) {
+        $('a[href="' + activeTab + '"]').click();
+    }
+    
+    // Debug panel functionality
+    $('#show-debug-btn').click(function() {
+        var $debugInfo = $('#debug-info');
+        var $button = $(this);
         
-        if (!apiKey.trim()) {
-            alert('<?php _e('Please enter an API key first.', 'ai-events-pro'); ?>');
-            return;
+        if ($debugInfo.is(':visible')) {
+            $debugInfo.hide();
+            $button.text('<?php _e('Show Debug Info', 'ai-events-pro'); ?>');
+        } else {
+            $button.text('<?php _e('Loading...', 'ai-events-pro'); ?>').prop('disabled', true);
+            
+            // Load current settings status
+            loadSettingsStatus();
+            
+            // Load debug log
+            $.post(ajaxurl, {
+                action: 'get_debug_log',
+                nonce: '<?php echo wp_create_nonce('ai_events_admin_nonce'); ?>'
+            }).done(function(response) {
+                if (response.success) {
+                    var logHtml = '';
+                    if (response.data.debug_log.length > 0) {
+                        response.data.debug_log.forEach(function(entry) {
+                            logHtml += '[' + entry.timestamp + '] ' + entry.message + '\n';
+                        });
+                    } else {
+                        logHtml = 'No debug entries found. Try syncing events to generate debug information.';
+                    }
+                    $('#debug-log').text(logHtml);
+                }
+            }).always(function() {
+                $debugInfo.show();
+                $button.text('<?php _e('Hide Debug Info', 'ai-events-pro'); ?>').prop('disabled', false);
+            });
         }
+    });
+    
+    $('#clear-debug-btn').click(function() {
+        if (!confirm('<?php _e('Clear debug log?', 'ai-events-pro'); ?>')) return;
         
-        $btn.prop('disabled', true).text('<?php _e('Testing...', 'ai-events-pro'); ?>');
+        var $button = $(this);
+        $button.prop('disabled', true).text('<?php _e('Clearing...', 'ai-events-pro'); ?>');
         
         $.post(ajaxurl, {
-            action: 'test_api_connection',
-            nonce: ai_events_admin.nonce,
-            api_type: apiType,
-            option_name: optionName,
-            field_name: fieldName,
-            api_key: apiKey
+            action: 'clear_debug_log',
+            nonce: '<?php echo wp_create_nonce('ai_events_admin_nonce'); ?>'
         }).done(function(response) {
             if (response.success) {
-                alert('✅ ' + response.data);
-            } else {
-                alert('❌ ' + response.data);
+                $('#debug-log').text('Debug log cleared.');
             }
         }).always(function() {
-            $btn.prop('disabled', false).text('<?php _e('Test Connection', 'ai-events-pro'); ?>');
+            $button.prop('disabled', false).text('<?php _e('Clear Debug Log', 'ai-events-pro'); ?>');
         });
     });
     
-    // Sync Events
+    // Sync events
     $('#sync-events-btn').click(function() {
-        var $btn = $(this);
+        var $button = $(this);
+        var $results = $('#sync-results');
+        
         var location = $('#sync_location').val().trim();
         var radius = $('#sync_radius').val();
         var limit = $('#sync_limit').val();
-        var $results = $('#sync-results');
         
         if (!location) {
-            alert('<?php _e('Please enter a location.', 'ai-events-pro'); ?>');
+            alert('<?php _e('Please enter a location to sync events.', 'ai-events-pro'); ?>');
+            $('#sync_location').focus();
             return;
         }
         
-        $btn.prop('disabled', true).text('<?php _e('Syncing...', 'ai-events-pro'); ?>');
+        // Show loading state
+        $button.prop('disabled', true).text('<?php _e('Syncing Events...', 'ai-events-pro'); ?>');
         $results.removeClass('success error').hide();
         
         $.post(ajaxurl, {
             action: 'sync_events',
-            nonce: ai_events_admin.nonce,
+            nonce: '<?php echo wp_create_nonce('ai_events_admin_nonce'); ?>',
             location: location,
             radius: radius,
             limit: limit
         }).done(function(response) {
             if (response.success) {
-                var html = '<strong>✅ ' + response.data.message + '</strong>';
-                if (response.data.events_preview) {
-                    html += '<div style="margin-top: 10px;"><strong>Preview:</strong>';
-                    $.each(response.data.events_preview, function(i, event) {
-                        html += '<br>• ' + event.title + ' (' + event.source + ')';
+                var html = '<div class="sync-success">';
+                html += '<strong>✅ ' + response.data.message + '</strong>';
+                html += '<p>Total events synced: ' + response.data.events_count + '</p>';
+                
+                if (response.data.events_preview && response.data.events_preview.length > 0) {
+                    html += '<div class="events-preview"><h4>Preview of synced events:</h4><ul>';
+                    response.data.events_preview.forEach(function(event) {
+                        html += '<li><strong>' + event.title + '</strong> - ' + event.date + ' (' + event.source + ')</li>';
                     });
-                    html += '</div>';
+                    html += '</ul></div>';
                 }
-                $results.addClass('success').html(html).show();
+                html += '</div>';
+                
+                $results.addClass('success').html(html).slideDown();
+                
+                // Update debug info if panel is open
+                if ($('#debug-info').is(':visible')) {
+                    updateDebugInfo(response.data.debug_info, response.data.sources_used);
+                }
             } else {
-                $results.addClass('error').html('<strong>❌ Error:</strong> ' + response.data).show();
+                // Enhanced error display with debug info
+                var errorHtml = '<div class="sync-error"><strong>❌ Sync Failed</strong>';
+                
+                if (response.data.debug_info) {
+                    errorHtml += '<h4>Debug Information:</h4>';
+                    errorHtml += '<pre style="background: #fff; padding: 10px; overflow-x: auto;">' + 
+                               JSON.stringify(response.data.debug_info, null, 2) + '</pre>';
+                }
+                
+                if (response.data.suggestions) {
+                    errorHtml += '<h4>Suggestions:</h4><ul>';
+                    response.data.suggestions.forEach(function(suggestion) {
+                        errorHtml += '<li>' + suggestion + '</li>';
+                    });
+                    errorHtml += '</ul>';
+                }
+                
+                if (response.data.debug_log) {
+                    errorHtml += '<details><summary>Recent Debug Log</summary><pre style="background: #fff; padding: 10px; max-height: 200px; overflow-y: auto;">';
+                    response.data.debug_log.forEach(function(entry) {
+                        errorHtml += '[' + entry.timestamp + '] ' + entry.message + '\n';
+                    });
+                    errorHtml += '</pre></details>';
+                }
+                
+                errorHtml += '</div>';
+                $results.addClass('error').html(errorHtml).slideDown();
             }
+        }).fail(function(xhr, status, error) {
+            $results.addClass('error')
+                    .html('<strong>❌ Network Error:</strong> ' + error)
+                    .slideDown();
         }).always(function() {
-            $btn.prop('disabled', false).text('<?php _e('Sync Events Now', 'ai-events-pro'); ?>');
+            $button.prop('disabled', false).text('<?php _e('Sync Events Now', 'ai-events-pro'); ?>');
         });
     });
     
-    // Clear Cache
+    // Clear cache
     $('#clear-cache-btn').click(function() {
-        if (!confirm('<?php _e('Clear all cached events?', 'ai-events-pro'); ?>')) return;
+        if (!confirm('<?php _e('Are you sure you want to clear all cached events? This cannot be undone.', 'ai-events-pro'); ?>')) {
+            return;
+        }
         
-        var $btn = $(this);
-        $btn.prop('disabled', true).text('<?php _e('Clearing...', 'ai-events-pro'); ?>');
+        var $button = $(this);
+        var $results = $('#sync-results');
+        
+        $button.prop('disabled', true).text('<?php _e('Clearing Cache...', 'ai-events-pro'); ?>');
         
         $.post(ajaxurl, {
             action: 'clear_events_cache',
-            nonce: ai_events_admin.nonce
+            nonce: '<?php echo wp_create_nonce('ai_events_admin_nonce'); ?>'
         }).done(function(response) {
-            var $results = $('#sync-results');
             if (response.success) {
-                $results.removeClass('error').addClass('success').html('<strong>✅ ' + response.data + '</strong>').show();
+                $results.removeClass('error')
+                        .addClass('success')
+                        .html('<strong>✅ ' + response.data + '</strong>')
+                        .slideDown();
             } else {
-                $results.removeClass('success').addClass('error').html('<strong>❌ Error:</strong> ' + response.data).show();
+                $results.removeClass('success')
+                        .addClass('error')
+                        .html('<strong>❌ Error:</strong> ' + response.data)
+                        .slideDown();
             }
         }).always(function() {
-            $btn.prop('disabled', false).text('<?php _e('Clear Cache', 'ai-events-pro'); ?>');
+            $button.prop('disabled', false).text('<?php _e('Clear Cache', 'ai-events-pro'); ?>');
         });
     });
+    
+    function loadSettingsStatus() {
+        var statusHtml = '<table class="widefat"><thead><tr><th>Source</th><th>Enabled</th><th>Configured</th><th>Status</th></tr></thead><tbody>';
+        statusHtml += '<tr><td colspan="4">Click "Sync Events Now" to see current status</td></tr>';
+        statusHtml += '</tbody></table>';
+        $('#settings-status').html(statusHtml);
+    }
+    
+    function updateDebugInfo(debugInfo, sourcesUsed) {
+        if (!debugInfo) return;
+        
+        var statusHtml = '<table class="widefat"><thead><tr><th>Source</th><th>Enabled</th><th>Configured</th><th>Status</th></tr></thead><tbody>';
+        
+        // Eventbrite
+        statusHtml += '<tr>';
+        statusHtml += '<td>Eventbrite</td>';
+        statusHtml += '<td>' + (debugInfo.api_status.eventbrite.enabled ? '✅ Yes' : '❌ No') + '</td>';
+        statusHtml += '<td>' + (debugInfo.api_status.eventbrite.configured ? '✅ Yes' : '❌ No') + '</td>';
+        statusHtml += '<td>' + (sourcesUsed.eventbrite ? sourcesUsed.eventbrite + ' events' : 'No events') + '</td>';
+        statusHtml += '</tr>';
+        
+        // Ticketmaster
+        statusHtml += '<tr>';
+        statusHtml += '<td>Ticketmaster</td>';
+        statusHtml += '<td>' + (debugInfo.api_status.ticketmaster.enabled ? '✅ Yes' : '❌ No') + '</td>';
+        statusHtml += '<td>' + (debugInfo.api_status.ticketmaster.configured ? '✅ Yes' : '❌ No') + '</td>';
+        statusHtml += '<td>' + (sourcesUsed.ticketmaster ? sourcesUsed.ticketmaster + ' events' : 'No events') + '</td>';
+        statusHtml += '</tr>';
+        
+        // Custom
+        statusHtml += '<tr>';
+        statusHtml += '<td>Custom Events</td>';
+        statusHtml += '<td>' + (debugInfo.api_status.custom.enabled ? '✅ Yes' : '❌ No') + '</td>';
+        statusHtml += '<td>✅ Always</td>';
+        statusHtml += '<td>' + (sourcesUsed.custom ? sourcesUsed.custom + ' events' : 'No events') + '</td>';
+        statusHtml += '</tr>';
+        
+        statusHtml += '</tbody></table>';
+        $('#settings-status').html(statusHtml);
+    }
 });
 </script>

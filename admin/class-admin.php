@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Fixed admin class with proper settings management
+ * Fixed admin class with proper settings management and debugging
  */
 class AI_Events_Admin {
 
@@ -16,6 +16,8 @@ class AI_Events_Admin {
         add_action('wp_ajax_sync_events', array($this, 'ajax_sync_events'));
         add_action('wp_ajax_test_api_connection', array($this, 'ajax_test_api_connection'));
         add_action('wp_ajax_clear_events_cache', array($this, 'ajax_clear_events_cache'));
+        add_action('wp_ajax_get_debug_log', array($this, 'ajax_get_debug_log'));
+        add_action('wp_ajax_clear_debug_log', array($this, 'ajax_clear_debug_log'));
     }
 
     public function enqueue_styles() {
@@ -152,13 +154,13 @@ class AI_Events_Admin {
             array($this, 'api_selection_callback'), 'ai_events_pro_general', 'ai_events_pro_general_section',
             array('option' => 'ai_events_pro_settings', 'value' => $general_settings));
 
-        // Eventbrite settings - Using only Private Token (most common)
+        // Eventbrite settings - Using only Private Token
         add_settings_field('eventbrite_private_token', __('Private Token', 'ai-events-pro'), 
             array($this, 'password_field_callback'), 'ai_events_pro_eventbrite', 'ai_events_pro_eventbrite_section',
             array('option' => 'ai_events_pro_eventbrite_settings', 'field' => 'private_token', 'value' => $eventbrite_settings['private_token'] ?? '', 
                   'description' => __('Your Eventbrite Private Token (Personal OAuth token)', 'ai-events-pro'), 'api_type' => 'eventbrite'));
 
-        // Ticketmaster settings - Using Consumer Key (API Key)
+        // Ticketmaster settings - Using Consumer Key
         add_settings_field('ticketmaster_consumer_key', __('Consumer Key (API Key)', 'ai-events-pro'), 
             array($this, 'password_field_callback'), 'ai_events_pro_ticketmaster', 'ai_events_pro_ticketmaster_section',
             array('option' => 'ai_events_pro_ticketmaster_settings', 'field' => 'consumer_key', 'value' => $ticketmaster_settings['consumer_key'] ?? '', 
@@ -295,7 +297,7 @@ class AI_Events_Admin {
             $sanitized['default_radius'] = 25;
         }
         
-        $sanitized['cache_duration'] = absint($input['cache_duration'] ?? 1) * 3600; // Convert hours to seconds
+        $sanitized['cache_duration'] = absint($input['cache_duration'] ?? 1) * 3600;
         
         $sanitized['enable_geolocation'] = !empty($input['enable_geolocation']);
         
@@ -306,7 +308,7 @@ class AI_Events_Admin {
                 $sanitized['enabled_apis'][$api] = !empty($enabled);
             }
         } else {
-            $sanitized['enabled_apis']['custom'] = true; // Always enable custom events
+            $sanitized['enabled_apis']['custom'] = true;
         }
         
         return $sanitized;
@@ -390,21 +392,46 @@ class AI_Events_Admin {
         
         try {
             $api_manager = new AI_Events_API_Manager();
+            
+            // Get debug info
+            $debug_info = $this->get_sync_debug_info();
+            
+            // Try to get events
             $events = $api_manager->get_events($location, $radius, $limit);
             
             if (!empty($events)) {
+                // Cache the events
                 $api_manager->cache_events($events, $location);
                 
                 wp_send_json_success(array(
                     'message' => sprintf(__('Successfully synced %d events from enabled sources.', 'ai-events-pro'), count($events)),
                     'events_count' => count($events),
-                    'events_preview' => array_slice($events, 0, 3)
+                    'events_preview' => array_slice($events, 0, 3),
+                    'debug_info' => $debug_info,
+                    'sources_used' => $this->get_sources_from_events($events)
                 ));
             } else {
-                wp_send_json_error(__('No events found. Please check your API credentials and enabled sources.', 'ai-events-pro'));
+                // No events found - provide detailed debug info
+                $debug_log = $api_manager->get_debug_log();
+                $last_log_entries = array_slice($debug_log, -10);
+                
+                wp_send_json_error(array(
+                    'message' => __('No events found. Check debug info below.', 'ai-events-pro'),
+                    'debug_info' => $debug_info,
+                    'debug_log' => $last_log_entries,
+                    'suggestions' => $this->get_troubleshooting_suggestions($debug_info)
+                ));
             }
         } catch (Exception $e) {
-            wp_send_json_error(__('Error: ', 'ai-events-pro') . $e->getMessage());
+            wp_send_json_error(array(
+                'message' => __('Error: ', 'ai-events-pro') . $e->getMessage(),
+                'debug_info' => $this->get_sync_debug_info(),
+                'error_details' => array(
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString()
+                )
+            ));
         }
     }
 
@@ -425,6 +452,138 @@ class AI_Events_Admin {
         } else {
             wp_send_json_error(__('Failed to clear cache.', 'ai-events-pro'));
         }
+    }
+
+    public function ajax_get_debug_log() {
+        check_ajax_referer('ai_events_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('Insufficient permissions.', 'ai-events-pro'));
+        }
+        
+        $api_manager = new AI_Events_API_Manager();
+        $debug_log = $api_manager->get_debug_log();
+        
+        wp_send_json_success(array(
+            'debug_log' => $debug_log,
+            'total_entries' => count($debug_log)
+        ));
+    }
+
+    public function ajax_clear_debug_log() {
+        check_ajax_referer('ai_events_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(__('Insufficient permissions.', 'ai-events-pro'));
+        }
+        
+        $api_manager = new AI_Events_API_Manager();
+        $api_manager->clear_debug_log();
+        
+        wp_send_json_success(__('Debug log cleared.', 'ai-events-pro'));
+    }
+
+    private function get_sync_debug_info() {
+        // Get all settings
+        $general_settings = get_option('ai_events_pro_settings', array());
+        $eventbrite_settings = get_option('ai_events_pro_eventbrite_settings', array());
+        $ticketmaster_settings = get_option('ai_events_pro_ticketmaster_settings', array());
+        $ai_settings = get_option('ai_events_pro_ai_settings', array());
+        
+        $debug_info = array(
+            'enabled_apis' => $general_settings['enabled_apis'] ?? array(),
+            'api_status' => array(
+                'eventbrite' => array(
+                    'enabled' => !empty($general_settings['enabled_apis']['eventbrite']),
+                    'configured' => !empty($eventbrite_settings['private_token']),
+                    'token_length' => !empty($eventbrite_settings['private_token']) ? strlen($eventbrite_settings['private_token']) : 0
+                ),
+                'ticketmaster' => array(
+                    'enabled' => !empty($general_settings['enabled_apis']['ticketmaster']),
+                    'configured' => !empty($ticketmaster_settings['consumer_key']),
+                    'key_length' => !empty($ticketmaster_settings['consumer_key']) ? strlen($ticketmaster_settings['consumer_key']) : 0
+                ),
+                'custom' => array(
+                    'enabled' => !empty($general_settings['enabled_apis']['custom']),
+                    'events_count' => wp_count_posts('ai_event')->publish ?? 0
+                ),
+                'ai' => array(
+                    'enabled' => !empty($ai_settings['enable_ai_features']),
+                    'configured' => !empty($ai_settings['openrouter_api_key'])
+                )
+            ),
+            'settings_saved' => array(
+                'general' => !empty($general_settings),
+                'eventbrite' => !empty($eventbrite_settings),
+                'ticketmaster' => !empty($ticketmaster_settings),
+                'ai' => !empty($ai_settings)
+            )
+        );
+        
+        return $debug_info;
+    }
+
+    private function get_sources_from_events($events) {
+        $sources = array();
+        foreach ($events as $event) {
+            $source = $event['source'] ?? 'unknown';
+            if (!isset($sources[$source])) {
+                $sources[$source] = 0;
+            }
+            $sources[$source]++;
+        }
+        return $sources;
+    }
+
+    private function get_troubleshooting_suggestions($debug_info) {
+        $suggestions = array();
+        
+        // Check if any APIs are enabled
+        $enabled_apis = $debug_info['enabled_apis'] ?? array();
+        $has_enabled_apis = array_filter($enabled_apis);
+        
+        if (empty($has_enabled_apis)) {
+            $suggestions[] = "❌ No event sources are enabled. Go to General settings and enable at least one source (Eventbrite, Ticketmaster, or Custom Events).";
+        }
+        
+        // Check Eventbrite
+        if (!empty($enabled_apis['eventbrite'])) {
+            if (!$debug_info['api_status']['eventbrite']['configured']) {
+                $suggestions[] = "❌ Eventbrite is enabled but no Private Token is configured. Add your Eventbrite Private Token in the Eventbrite settings tab.";
+            } elseif ($debug_info['api_status']['eventbrite']['token_length'] < 20) {
+                $suggestions[] = "⚠️ Eventbrite Private Token seems too short. Make sure you copied the complete token.";
+            } else {
+                $suggestions[] = "✅ Eventbrite appears configured correctly.";
+            }
+        }
+        
+        // Check Ticketmaster
+        if (!empty($enabled_apis['ticketmaster'])) {
+            if (!$debug_info['api_status']['ticketmaster']['configured']) {
+                $suggestions[] = "❌ Ticketmaster is enabled but no Consumer Key is configured. Add your Ticketmaster Consumer Key in the Ticketmaster settings tab.";
+            } elseif ($debug_info['api_status']['ticketmaster']['key_length'] < 10) {
+                $suggestions[] = "⚠️ Ticketmaster Consumer Key seems too short. Make sure you copied the complete key.";
+            } else {
+                $suggestions[] = "✅ Ticketmaster appears configured correctly.";
+            }
+        }
+        
+        // Check Custom Events
+        if (!empty($enabled_apis['custom'])) {
+            if ($debug_info['api_status']['custom']['events_count'] == 0) {
+                $suggestions[] = "ℹ️ Custom Events is enabled but no published events found. Create some events or try a broader location search.";
+            } else {
+                $suggestions[] = "✅ Custom Events: Found " . $debug_info['api_status']['custom']['events_count'] . " published events.";
+            }
+        }
+        
+        if (empty($suggestions)) {
+            $suggestions[] = "Try testing your API connections individually using the 'Test Connection' buttons.";
+            $suggestions[] = "Try a different location (e.g., 'New York, NY' instead of just 'New York').";
+            $suggestions[] = "Increase the search radius to find more events.";
+        }
+        
+        return $suggestions;
     }
 
     // API Test Methods
