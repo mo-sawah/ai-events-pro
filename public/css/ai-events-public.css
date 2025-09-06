@@ -18,9 +18,9 @@
   --ae-sp-1: 0.25rem;
   --ae-sp-2: 0.5rem;
   --ae-sp-3: 0.75rem;
-  --ae-sp-4: 1rem;
-  --ae-sp-5: 1.25rem;
-  --ae-sp-6: 1.5rem;
+  --ae-sp-4: 1.6rem;
+  --ae-sp-5: 1.8rem;
+  --ae-sp-6: 2rem;
 
   --ae-r-8: 8px;
   --ae-r-10: 10px;
@@ -342,6 +342,7 @@ body.ai-events-theme-dark .aiep {
 .aiep .ae-btn--primary:hover {
   background: var(--ae-primary-600);
   border-color: var(--ae-primary-600);
+  color: #fff;
 }
 
 /* Grid: 3 cols desktop, 2 tablet, 1 mobile */
@@ -466,7 +467,7 @@ body.ai-events-theme-dark .aiep {
 .aiep .aiep-chip {
   display: inline-block;
   border-radius: 999px;
-  padding: 0.2rem 0.55rem;
+  padding: 0.1rem 0.8rem;
   border: 1px solid var(--ae-border);
   background: #eef2ff;
   color: #1e40af;
