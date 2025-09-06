@@ -627,3 +627,11 @@ body.ai-events-theme-dark .aiep {
 .aiep .aiep-grid {
   align-items: stretch; /* default for grid, but enforce just in case */
 }
+
+.aiep-pager .ae-btn--primary {
+  background: #000000;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 5px 80px;
+  margin-top: 30px;
+}
