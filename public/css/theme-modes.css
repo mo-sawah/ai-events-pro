@@ -1,0 +1,124 @@
+/* AI Events Pro - Theme Modes */
+
+:root {
+  /* Light theme (default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  --accent-color: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-light: #dbeafe;
+  --success-color: #059669;
+  --error-color: #dc2626;
+  --warning-color: #d97706;
+}
+
+/* Dark theme */
+[data-theme="dark"],
+.ai-events-theme-dark {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-hover: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --border-color: #334155;
+  --border-light: #475569;
+  --accent-color: #60a5fa;
+  --accent-hover: #3b82f6;
+  --accent-light: #1e3a8a;
+  --success-color: #10b981;
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+}
+
+/* Auto theme detection */
+@media (prefers-color-scheme: dark) {
+  :root:not(.ai-events-theme-light):not(.ai-events-theme-dark) {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-hover: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    --border-color: #334155;
+    --border-light: #475569;
+    --accent-color: #60a5fa;
+    --accent-hover: #3b82f6;
+    --accent-light: #1e3a8a;
+    --success-color: #10b981;
+    --error-color: #ef4444;
+    --warning-color: #f59e0b;
+  }
+}
+
+/* Theme toggle animations */
+.theme-toggle-btn .light-icon {
+  opacity: 1;
+}
+
+.theme-toggle-btn .dark-icon {
+  opacity: 0;
+}
+
+[data-theme="dark"] .theme-toggle-btn .light-icon,
+.ai-events-theme-dark .theme-toggle-btn .light-icon {
+  opacity: 0;
+}
+
+[data-theme="dark"] .theme-toggle-btn .dark-icon,
+.ai-events-theme-dark .theme-toggle-btn .dark-icon {
+  opacity: 1;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+/* Theme-specific adjustments */
+[data-theme="dark"] .ai-event-card:hover,
+.ai-events-theme-dark .ai-event-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .events-loading,
+.ai-events-theme-dark .events-loading {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border-color: #000000;
+    --text-secondary: #000000;
+    --accent-color: #0000ff;
+  }
+
+  [data-theme="dark"],
+  .ai-events-theme-dark {
+    --border-color: #ffffff;
+    --text-secondary: #ffffff;
+    --accent-color: #66b3ff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .loading-spinner {
+    animation: none;
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--accent-color);
+  }
+}
