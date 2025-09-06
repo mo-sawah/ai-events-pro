@@ -1,9 +1,7 @@
 <?php
 /**
- * Events page template (Compact White UI)
- * - Keeps original element IDs so existing JS continues to work.
+ * Events page template (Compact White UI, updated top filters + solid icons)
  */
-
 $api_manager = new AI_Events_API_Manager();
 $settings = get_option('ai_events_pro_settings', array());
 $user_location = '';
@@ -13,7 +11,6 @@ if (!empty($settings['enable_geolocation'])) {
     $user_location = $public->get_user_location();
 }
 
-// Shortcode atts are available via $atts from the caller.
 $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
 ?>
 <div class="aiep ai-events-container" data-user-location="<?php echo esc_attr($user_location); ?>">
@@ -21,7 +18,7 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
   <!-- Theme Toggle -->
   <div class="ae-theme-toggle">
     <button id="theme-toggle" class="ae-toggle" type="button" aria-label="<?php esc_attr_e('Toggle theme', 'ai-events-pro'); ?>">
-      <span class="ae-toggle__icon">☀️</span>
+      <svg class="ae-icon ae-icon--24 ae-toggle__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a1 1 0 0 1 1 1v1a7 7 0 1 0 7 7h1a1 1 0 1 1 0 2h-1a9 9 0 1 1-9-9V3a1 1 0 0 1 1-1z"/></svg>
       <span class="ae-toggle__label"><?php esc_html_e('Light', 'ai-events-pro'); ?></span>
     </button>
   </div>
@@ -29,7 +26,9 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
   <!-- Filters -->
   <section class="ae-filters" aria-labelledby="ae-filters-title">
     <div class="ae-filters__head">
-      <span class="ae-bubble">🔎</span>
+      <span class="ae-bubble" aria-hidden="true">
+        <svg class="ae-icon ae-icon--24" viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 1 5.293 13.707l4 4a1 1 0 0 1-1.414 1.414l-4-4A8 8 0 0 1 10 2zm0 2a6 6 0 1 0 .001 12.001A6 6 0 0 0 10 4z"/></svg>
+      </span>
       <div>
         <div id="ae-filters-title" class="ae-filters__title"><?php _e('Event Filters', 'ai-events-pro'); ?></div>
         <div class="ae-filters__desc"><?php _e('Use location, radius, category, and source to refine your results', 'ai-events-pro'); ?></div>
@@ -37,12 +36,14 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
     </div>
 
     <div class="ae-fields">
-      <!-- Location text (same ID used by JS) -->
+      <!-- Location -->
       <div class="ae-field ae-field--span-4">
         <label class="ae-label" for="location-filter"><?php _e('Location', 'ai-events-pro'); ?></label>
         <div class="ae-input-wrap">
           <input type="text" id="location-filter" class="ae-input" placeholder="<?php esc_attr_e('Type a city (e.g., New York, NY)', 'ai-events-pro'); ?>" value="<?php echo esc_attr($user_location); ?>"/>
-          <button id="get-location-btn" type="button" class="ae-geo-btn" title="<?php esc_attr_e('Use my location', 'ai-events-pro'); ?>">📍</button>
+          <button id="get-location-btn" type="button" class="ae-geo-btn" title="<?php esc_attr_e('Use my location', 'ai-events-pro'); ?>" aria-label="<?php esc_attr_e('Use my location', 'ai-events-pro'); ?>">
+            <svg class="ae-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7zm0 9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
+          </button>
         </div>
       </div>
 
@@ -52,13 +53,12 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
         <select id="radius-filter" class="ae-select">
           <?php
           $radius_default = isset($settings['default_radius']) ? intval($settings['default_radius']) : 25;
-          $radii = array(5, 10, 25, 50, 100);
-          foreach ($radii as $r) {
-              printf('<option value="%1$d"%2$s>%1$d %3$s</option>',
-                  $r,
-                  selected($r, $radius_default, false),
-                  esc_html__('miles', 'ai-events-pro')
-              );
+          foreach (array(5,10,25,50,100) as $r) {
+            printf('<option value="%1$d"%2$s>%1$d %3$s</option>',
+              $r,
+              selected($r, $radius_default, false),
+              esc_html__('miles', 'ai-events-pro')
+            );
           }
           ?>
         </select>
@@ -92,9 +92,13 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
         </select>
       </div>
 
-      <!-- Apply -->
-      <div class="ae-field ae-field--submit">
-        <button id="apply-filters-btn" class="ae-btn ae-btn--primary" type="button"><?php _e('Apply Filters', 'ai-events-pro'); ?></button>
+      <!-- Full-width Apply button row -->
+      <div class="ae-field ae-field--full">
+        <div class="ae-apply-row">
+          <button id="apply-filters-btn" class="ae-btn ae-btn--primary" type="button">
+            <?php _e('APPLY FILTERS', 'ai-events-pro'); ?>
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -102,12 +106,14 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
   <!-- Search -->
   <section class="ae-search">
     <div class="ae-search__wrap">
-      <span class="ae-search__icon">🔎</span>
+      <span class="ae-search__icon" aria-hidden="true">
+        <svg class="ae-icon" viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 1 5.293 13.707l4 4a1 1 0 0 1-1.414 1.414l-4-4A8 8 0 0 1 10 2zm0 2a6 6 0 1 0 .001 12.001A6 6 0 0 0 10 4z"/></svg>
+      </span>
       <input id="event-search" type="search" placeholder="<?php esc_attr_e('Search events by name, keyword, or description…', 'ai-events-pro'); ?>"/>
     </div>
   </section>
 
-  <!-- Loading State -->
+  <!-- Loading -->
   <div id="events-loading" class="events-loading" style="display:none;">
     <div class="loading-spinner"></div>
     <p><?php _e('Loading events…', 'ai-events-pro'); ?></p>
@@ -115,7 +121,7 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
 
   <!-- Results -->
   <div id="events-container" class="aiep-grid layout-<?php echo esc_attr($layout); ?>">
-    <!-- Event cards inserted via AJAX -->
+    <!-- Event cards injected via AJAX -->
   </div>
 
   <!-- Pagination -->

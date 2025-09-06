@@ -1,8 +1,4 @@
-/* AI Events Pro – Compact White Frontend UI
-   - Works for both the main page and widget
-   - Light by default; dark overrides via body.ai-events-theme-dark
-   - Scoped to .aiep to avoid theme collisions
-*/
+/* AI Events Pro – Compact White Frontend UI (updated top filters + solid icons) */
 
 /* Design tokens (Light) */
 .aiep {
@@ -37,7 +33,7 @@
   --ae-fs-18: 18px;
 }
 
-/* Dark mode overrides (applied to entire container) */
+/* Dark mode overrides */
 body.ai-events-theme-dark .aiep {
   --ae-bg: #0f172a;
   --ae-surface: #111827;
@@ -71,6 +67,24 @@ body.ai-events-theme-dark .aiep {
   padding: var(--ae-sp-6) var(--ae-sp-4);
 }
 
+/* Solid icon helper */
+.aiep .ae-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.aiep .ae-icon--24 {
+  width: 24px;
+  height: 24px;
+}
+.aiep .ae-icon path,
+.aiep .ae-icon circle,
+.aiep .ae-icon rect,
+.aiep .ae-icon polygon {
+  fill: currentColor;
+}
+
 /* Theme toggle */
 .aiep .ae-theme-toggle {
   display: flex;
@@ -94,50 +108,11 @@ body.ai-events-theme-dark .aiep {
   color: var(--ae-text-soft);
 }
 
-/* Search bar */
-.aiep .ae-search {
-  background: var(--ae-surface);
-  border: 1px solid var(--ae-border);
-  border-radius: 14px;
-  padding: var(--ae-sp-3);
-  box-shadow: var(--ae-shadow);
-  margin-bottom: var(--ae-sp-3);
-}
-.aiep .ae-search__wrap {
-  position: relative;
-}
-.aiep .ae-search__icon {
-  position: absolute;
-  left: 0.9rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--ae-text-soft);
-  font-size: 18px;
-}
-.aiep .ae-search input[type="search"] {
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid var(--ae-border);
-  padding: 0.85rem 1rem 0.85rem 2.6rem;
-  font-size: var(--ae-fs-14);
-  background: var(--ae-surface-alt);
-  color: var(--ae-text);
-  outline: none;
-}
-.aiep .ae-search input[type="search"]:focus {
-  background: var(--ae-surface);
-  border-color: var(--ae-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ae-primary) 14%, transparent);
-}
-.aiep .ae-search input::placeholder {
-  color: color-mix(in srgb, var(--ae-text-soft) 70%, transparent);
-}
-
-/* Filters card */
+/* Filters card (matches your screenshot) */
 .aiep .ae-filters {
   background: var(--ae-surface);
   border: 1px solid var(--ae-border);
-  border-radius: 16px;
+  border-radius: 18px; /* slightly larger */
   box-shadow: var(--ae-shadow);
   padding: var(--ae-sp-4);
   margin-bottom: var(--ae-sp-4);
@@ -157,7 +132,6 @@ body.ai-events-theme-dark .aiep {
   align-items: center;
   justify-content: center;
   color: var(--ae-primary);
-  font-size: 18px;
 }
 .aiep .ae-filters__title {
   font-weight: 700;
@@ -167,6 +141,7 @@ body.ai-events-theme-dark .aiep {
   font-size: var(--ae-fs-13);
 }
 
+/* Fields: grid */
 .aiep .ae-fields {
   display: grid;
   gap: var(--ae-sp-3);
@@ -184,53 +159,36 @@ body.ai-events-theme-dark .aiep {
 .aiep .ae-field--span-3 {
   grid-column: span 3;
 }
-.aiep .ae-field--submit {
-  grid-column: span 2;
-  display: flex;
-  justify-content: flex-end;
-}
-
+.aiep .ae-field--full {
+  grid-column: 1 / -1;
+} /* full width row for Apply button */
 .aiep .ae-label {
   font-size: var(--ae-fs-12);
   color: var(--ae-text-soft);
 }
 
+/* Inputs with rounded corners like screenshot */
 .aiep .ae-input-wrap {
   position: relative;
 }
 .aiep .ae-input {
   width: 100%;
-  border-radius: var(--ae-r-10);
+  border-radius: 14px; /* more pill-like */
   border: 1px solid var(--ae-border);
-  padding: 0.7rem 2.4rem 0.7rem 0.9rem;
+  padding: 0.78rem 2.8rem 0.78rem 1rem;
   font-size: var(--ae-fs-14);
   background: var(--ae-surface);
   color: var(--ae-text);
   outline: none;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease,
+    background 0.12s ease;
 }
 .aiep .ae-input:focus {
   border-color: var(--ae-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ae-primary) 24%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ae-primary) 14%, transparent);
 }
 .aiep .ae-input::placeholder {
   color: color-mix(in srgb, var(--ae-text-soft) 70%, transparent);
-}
-
-.aiep .ae-geo-btn {
-  position: absolute;
-  right: 0.35rem;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 1px solid var(--ae-border);
-  background: var(--ae-surface);
-  color: var(--ae-text);
-  border-radius: 8px;
-  padding: 0.45rem 0.6rem;
-  font-size: 13px;
-  cursor: pointer;
-}
-.aiep .ae-geo-btn:hover {
-  background: var(--ae-surface-alt);
 }
 
 .aiep .ae-select {
@@ -238,15 +196,88 @@ body.ai-events-theme-dark .aiep {
   width: 100%;
   background: var(--ae-surface);
   border: 1px solid var(--ae-border);
-  border-radius: var(--ae-r-10);
-  padding: 0.7rem 0.9rem;
+  border-radius: 14px;
+  padding: 0.78rem 1rem;
   font-size: var(--ae-fs-14);
   color: var(--ae-text);
   outline: none;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
 }
 .aiep .ae-select:focus {
   border-color: var(--ae-primary);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ae-primary) 24%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ae-primary) 14%, transparent);
+}
+
+/* Solid map-pin button inside Location input */
+.aiep .ae-geo-btn {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 1px solid var(--ae-border);
+  background: var(--ae-surface);
+  color: var(--ae-danger); /* red pin */
+  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--ae-shadow);
+}
+.aiep .ae-geo-btn:hover {
+  background: var(--ae-surface-alt);
+}
+
+/* Full-width Apply button row */
+.aiep .ae-apply-row {
+  display: flex;
+}
+.aiep .ae-apply-row .ae-btn--primary {
+  width: 100%;
+  padding: 0.9rem 1.2rem;
+  border-radius: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* Search bar under filters */
+.aiep .ae-search {
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
+  border-radius: 16px;
+  padding: var(--ae-sp-3);
+  box-shadow: var(--ae-shadow);
+  margin-bottom: var(--ae-sp-3);
+}
+.aiep .ae-search__wrap {
+  position: relative;
+}
+.aiep .ae-search__icon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ae-text-soft);
+}
+.aiep .ae-search input[type="search"] {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--ae-border);
+  padding: 0.85rem 1rem 0.85rem 2.6rem;
+  font-size: var(--ae-fs-14);
+  background: var(--ae-surface-alt);
+  color: var(--ae-text);
+  outline: none;
+}
+.aiep .ae-search input[type="search"]:focus {
+  background: var(--ae-surface);
+  border-color: var(--ae-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ae-primary) 14%, transparent);
+}
+.aiep .ae-search input::placeholder {
+  color: color-mix(in srgb, var(--ae-text-soft) 70%, transparent);
 }
 
 /* Buttons */
@@ -405,14 +436,21 @@ body.ai-events-theme-dark .aiep {
   font-weight: 700;
 }
 
+/* Card footer: 100% width primary button */
 .aiep .aiep-card__foot {
   padding: var(--ae-sp-3) var(--ae-sp-4);
   display: flex;
   gap: var(--ae-sp-2);
   align-items: center;
 }
+.aiep .aiep-card__foot .ae-btn--primary {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  font-weight: 700;
+}
 
-/* Widget adjustments (smaller paddings/typography) */
+/* Widget adjustments */
 .aiep.aiep-widget .aiep-card__head {
   padding: var(--ae-sp-3);
 }
@@ -425,7 +463,7 @@ body.ai-events-theme-dark .aiep {
 .aiep.aiep-widget .aiep-card__title {
   font-size: 16px;
 }
-.aiep.aiep-widget .aiep-btn {
+.aiep.aiep-widget .ae-btn {
   padding: 0.45rem 0.65rem;
   font-size: var(--ae-fs-13);
 }
@@ -479,15 +517,12 @@ body.ai-events-theme-dark .aiep {
   }
 }
 
-/* Responsive fields */
+/* Responsive fields for filters */
 @media (max-width: 1100px) {
   .aiep .ae-field--span-4 {
     grid-column: span 6;
   }
   .aiep .ae-field--span-3 {
-    grid-column: span 3;
-  }
-  .aiep .ae-field--submit {
     grid-column: span 3;
   }
 }
@@ -497,7 +532,7 @@ body.ai-events-theme-dark .aiep {
   }
   .aiep .ae-field--span-4,
   .aiep .ae-field--span-3,
-  .aiep .ae-field--submit {
+  .aiep .ae-field--full {
     grid-column: span 2;
   }
 }
