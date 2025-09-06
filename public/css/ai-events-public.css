@@ -581,3 +581,33 @@ body.ai-events-theme-dark .aiep {
     display: none;
   }
 }
+
+/* Search icon: force stroke rendering for previous magnifier */
+.aiep .ae-search__icon .ae-icon * {
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Guard against themes injecting pseudo icons */
+.aiep .ae-search__icon::before {
+  content: none !important;
+}
+
+/* Magnifier icons: render via stroke to avoid filled “Q” look */
+.aiep .ae-search__icon .ae-icon *,
+.aiep .ae-bubble .ae-icon * {
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Guard against themes injecting pseudo icons */
+.aiep .ae-search__icon::before,
+.aiep .ae-bubble::before {
+  content: none !important;
+}

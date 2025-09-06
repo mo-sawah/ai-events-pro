@@ -20,10 +20,11 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
     <div class="ae-filters__head">
       <div class="ae-filters__head-inner">
         <span class="ae-bubble" aria-hidden="true">
-        <svg class="ae-icon ae-icon--24" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill-rule="evenodd" clip-rule="evenodd"
-            d="M10 2a8 8 0 1 1 5.293 13.707l4 4a1 1 0 0 1-1.414 1.414l-4-4A8 8 0 0 1 10 2zm0 2a6 6 0 1 0 .001 12.001A6 6 0 0 0 10 4z"/>
-        </svg>
+          <!-- Stroke-based magnifier (matches search input icon) -->
+          <svg class="ae-icon ae-icon--24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
         </span>
         <div class="ae-filters__titlewrap">
           <div id="ae-filters-title" class="ae-filters__title"><?php _e('Event Filters', 'ai-events-pro'); ?></div>
@@ -114,7 +115,11 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
   <section class="ae-search">
     <div class="ae-search__wrap">
       <span class="ae-search__icon" aria-hidden="true">
-        <svg class="ae-icon" viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 1 5.293 13.707l4 4a1 1 0 0 1-1.414 1.414l-4-4A8 8 0 0 1 10 2zm0 2a6 6 0 1 0 .001 12.001A6 6 0 0 0 10 4z"/></svg>
+        <!-- Stroke-based magnifier (previous icon) -->
+        <svg class="ae-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
       </span>
       <input id="event-search" type="search" placeholder="<?php esc_attr_e('Search events by name, keyword, or description…', 'ai-events-pro'); ?>"/>
     </div>
