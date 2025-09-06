@@ -94,12 +94,12 @@ class AI_Events_API_Manager {
             $this->debug_log("AI features are disabled or not configured");
         }
         
-        // Sort events by date
+        // Sort events by date and time
         if (!empty($all_events)) {
             usort($all_events, function($a, $b) {
-                $date_a = !empty($a['date']) ? strtotime($a['date']) : 0;
-                $date_b = !empty($b['date']) ? strtotime($b['date']) : 0;
-                return $date_a - $date_b;
+                $date_a = !empty($a['date']) ? strtotime(($a['date'] ?? '') . ' ' . ($a['time'] ?? '00:00')) : 0;
+                $date_b = !empty($b['date']) ? strtotime(($b['date'] ?? '') . ' ' . ($b['time'] ?? '00:00')) : 0;
+                return $date_a <=> $date_b;
             });
         }
         

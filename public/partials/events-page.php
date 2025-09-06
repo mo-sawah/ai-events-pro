@@ -34,7 +34,7 @@ if (!empty($settings['enable_geolocation'])) {
                 <input type="text" id="event-search" placeholder="<?php _e('Search events...', 'ai-events-pro'); ?>" />
                 <button type="button" id="search-btn" class="search-btn">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" stroke-width="2"/>
+                        <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </button>
             </div>
@@ -49,7 +49,7 @@ if (!empty($settings['enable_geolocation'])) {
                     <input type="text" id="location-filter" placeholder="<?php _e('Enter location...', 'ai-events-pro'); ?>" value="<?php echo esc_attr($user_location); ?>" />
                     <button type="button" id="get-location-btn" class="location-btn" title="<?php _e('Use my location', 'ai-events-pro'); ?>">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 8C13.1 8 14 8.9 14 10C14 11.1 13.1 12 12 12C10.9 12 10 11.1 10 10C10 8.9 10.9 8 12 8ZM21 10C21 7 19 5 12 5C5 5 3 7 3 10C3 13 12 22 12 22C12 22 21 13 21 10Z" fill="currentColor"/>
+                            <path d="M12 8C13.1 8 14 8.9 14 10C14 11.1 13.1 12 12 12C10.9 12 10 11.1 10 10C10 8.9 10.9 8 12 8ZM21 10C21 7 19 5 12 5C5 5 3 7 3 10C3 13 12 22 12 22C12 22 21 13 21 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                         </svg>
                     </button>
                 </div>
@@ -125,10 +125,3 @@ if (!empty($settings['enable_geolocation'])) {
         <p><?php _e('Try adjusting your search criteria or check back later for new events.', 'ai-events-pro'); ?></p>
     </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const eventsPage = new AIEventsPage();
-    eventsPage.init();
-});
-</script>

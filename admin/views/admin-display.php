@@ -89,7 +89,7 @@ $stats = $event_manager->get_events_statistics();
                     <div class="action-icon">🔄</div>
                     <h4><?php _e('Sync Events', 'ai-events-pro'); ?></h4>
                     <p><?php _e('Import events from Eventbrite and Ticketmaster APIs.', 'ai-events-pro'); ?></p>
-                    <a href="<?php echo admin_url('admin.php?page=' . AI_EVENTS_PRO_PLUGIN_NAME . '-settings&tab=api'); ?>" class="button">
+                    <a href="<?php echo admin_url('admin.php?page=' . AI_EVENTS_PRO_PLUGIN_NAME . '-settings'); ?>" class="button">
                         <?php _e('Sync Now', 'ai-events-pro'); ?>
                     </a>
                 </div>
@@ -102,15 +102,6 @@ $stats = $event_manager->get_events_statistics();
                         <?php _e('Settings', 'ai-events-pro'); ?>
                     </a>
                 </div>
-
-                <div class="action-card">
-                    <div class="action-icon">📊</div>
-                    <h4><?php _e('Analytics', 'ai-events-pro'); ?></h4>
-                    <p><?php _e('View detailed analytics and performance metrics.', 'ai-events-pro'); ?></p>
-                    <a href="<?php echo admin_url('admin.php?page=' . AI_EVENTS_PRO_PLUGIN_NAME . '-analytics'); ?>" class="button">
-                        <?php _e('View Analytics', 'ai-events-pro'); ?>
-                    </a>
-                </div>
             </div>
         </div>
 
@@ -119,9 +110,13 @@ $stats = $event_manager->get_events_statistics();
             <h3><?php _e('System Status', 'ai-events-pro'); ?></h3>
             <div class="status-grid">
                 <?php
-                $eventbrite_token = get_option('ai_events_pro_eventbrite_token', '');
-                $ticketmaster_key = get_option('ai_events_pro_ticketmaster_key', '');
-                $openrouter_key = get_option('ai_events_pro_openrouter_key', '');
+                $eventbrite_settings = get_option('ai_events_pro_eventbrite_settings', array());
+                $ticketmaster_settings = get_option('ai_events_pro_ticketmaster_settings', array());
+                $ai_settings = get_option('ai_events_pro_ai_settings', array());
+
+                $eventbrite_token = $eventbrite_settings['private_token'] ?? '';
+                $ticketmaster_key = $ticketmaster_settings['consumer_key'] ?? '';
+                $openrouter_key = $ai_settings['openrouter_api_key'] ?? '';
                 ?>
                 
                 <div class="status-item">

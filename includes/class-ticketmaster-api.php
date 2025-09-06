@@ -23,9 +23,11 @@ class AI_Events_Ticketmaster_API {
             return array();
         }
         
+        $city = $this->extract_city($location);
+
         $params = array(
             'apikey' => $this->consumer_key,
-            'city' => $location,
+            'city' => $city,
             'radius' => $radius,
             'unit' => 'miles',
             'sort' => 'date,asc',
@@ -35,6 +37,11 @@ class AI_Events_Ticketmaster_API {
         );
         
         $url = $this->base_url . 'events.json?' . http_build_query($params);
+
+        // Log final URL for debugging (optional)
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('[AI Events Pro] Ticketmaster URL: ' . $url);
+        }
         
         $response = wp_remote_get($url, array(
             'timeout' => 30,
@@ -221,6 +228,17 @@ class AI_Events_Ticketmaster_API {
         
         return '';
     }
+
+    /**
+     * Extract a city name from a location string like "New York, NY"
+     */
+    private function extract_city($location) {
+        if (empty($location)) {
+            return '';
+        }
+        $parts = array_map('trim', explode(',', $location));
+        return !empty($parts[0]) ? $parts[0] : $location;
+    }
     
     /**
      * Test API connection
@@ -308,7 +326,7 @@ class AI_Events_Ticketmaster_API {
         
         $params = array(
             'apikey' => $this->consumer_key,
-            'city' => $location,
+            'city' => $this->extract_city($location),
             'size' => 20
         );
         

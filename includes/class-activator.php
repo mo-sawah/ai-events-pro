@@ -30,19 +30,29 @@ class AI_Events_Activator {
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
         
-        // Set default options
+        // Set default options (align with settings structure)
         $default_settings = array(
             'events_per_page' => 12,
             'enable_geolocation' => true,
             'default_radius' => 25,
             'cache_duration' => 3600,
-            'enable_ai_features' => true,
             'theme_mode' => 'auto',
-            'enable_eventbrite' => true,
-            'enable_ticketmaster' => true
+            'enabled_apis' => array(
+                'custom' => true,
+                'eventbrite' => false,
+                'ticketmaster' => false,
+            ),
         );
-        
         add_option('ai_events_pro_settings', $default_settings);
+
+        // AI settings default in a separate option
+        $default_ai_settings = array(
+            'enable_ai_features' => false,
+            'ai_categorization' => true,
+            'ai_summaries' => true,
+            'openrouter_api_key' => '',
+        );
+        add_option('ai_events_pro_ai_settings', $default_ai_settings);
         
         // Flush rewrite rules
         flush_rewrite_rules();

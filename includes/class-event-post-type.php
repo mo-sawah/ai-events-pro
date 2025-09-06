@@ -151,7 +151,11 @@ class AI_Events_Post_Type {
         
         foreach ($fields as $field) {
             if (isset($_POST[$field])) {
-                update_post_meta($post_id, '_' . $field, sanitize_text_field($_POST[$field]));
+                if ($field === 'event_url') {
+                    update_post_meta($post_id, '_' . $field, esc_url_raw($_POST[$field]));
+                } else {
+                    update_post_meta($post_id, '_' . $field, sanitize_text_field($_POST[$field]));
+                }
             }
         }
     }

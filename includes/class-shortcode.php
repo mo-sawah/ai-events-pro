@@ -51,7 +51,7 @@ class AI_Events_Shortcode {
             'limit' => 10,
             'category' => '',
             'source' => 'all', // all, eventbrite, ticketmaster, custom
-            'orderby' => 'date',
+            'orderby' => 'date', // date, title, ai_score
             'order' => 'ASC'
         ), $atts);
         
@@ -68,9 +68,37 @@ class AI_Events_Shortcode {
         // Filter by category if specified
         if (!empty($atts['category'])) {
             $events = array_filter($events, function($event) use ($atts) {
-                return stripos($event['category'], $atts['category']) !== false;
+                return stripos($event['category'], $atts['category']) !== false
+                    || (!empty($event['ai_category']) && stripos($event['ai_category'], $atts['category']) !== false);
             });
         }
+
+        // Sort if applicable
+        $orderby = strtolower($atts['orderby']);
+        $order = strtoupper($atts['order']) === 'DESC' ? 'DESC' : 'ASC';
+
+        usort($events, function($a, $b) use ($orderby, $order) {
+            $result = 0;
+            switch ($orderby) {
+                case 'title':
+                    $ta = $a['title'] ?? '';
+                    $tb = $b['title'] ?? '';
+                    $result = strcasecmp($ta, $tb);
+                    break;
+                case 'ai_score':
+                    $sa = intval($a['ai_score'] ?? 0);
+                    $sb = intval($b['ai_score'] ?? 0);
+                    $result = $sa <=> $sb;
+                    break;
+                case 'date':
+                default:
+                    $da = !empty($a['date']) ? strtotime(($a['date'] ?? '') . ' ' . ($a['time'] ?? '00:00')) : 0;
+                    $db = !empty($b['date']) ? strtotime(($b['date'] ?? '') . ' ' . ($b['time'] ?? '00:00')) : 0;
+                    $result = $da <=> $db;
+                    break;
+            }
+            return $order === 'DESC' ? -$result : $result;
+        });
         
         ob_start();
         ?>

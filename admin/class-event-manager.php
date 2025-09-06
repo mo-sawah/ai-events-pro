@@ -227,26 +227,43 @@ class AI_Events_Event_Manager {
 
     public function get_api_status() {
         $status = array();
-        
-        // Check Eventbrite
-        $eventbrite_token = get_option('ai_events_pro_eventbrite_private_token', '');
+
+        // General settings for enabled flags
+        $general_settings = get_option('ai_events_pro_settings', array());
+        $enabled_apis = $general_settings['enabled_apis'] ?? array();
+
+        // Eventbrite
+        $eventbrite_settings = get_option('ai_events_pro_eventbrite_settings', array());
+        $eventbrite_token = $eventbrite_settings['private_token'] ?? '';
         $status['eventbrite'] = array(
             'configured' => !empty($eventbrite_token),
-            'status' => !empty($eventbrite_token) ? 'connected' : 'not_configured'
+            'status' => !empty($eventbrite_token) ? 'connected' : 'not_configured',
+            'enabled' => !empty($enabled_apis['eventbrite'])
         );
-        
-        // Check Ticketmaster
-        $ticketmaster_key = get_option('ai_events_pro_ticketmaster_consumer_key', '');
+
+        // Ticketmaster
+        $ticketmaster_settings = get_option('ai_events_pro_ticketmaster_settings', array());
+        $ticketmaster_key = $ticketmaster_settings['consumer_key'] ?? '';
         $status['ticketmaster'] = array(
             'configured' => !empty($ticketmaster_key),
-            'status' => !empty($ticketmaster_key) ? 'connected' : 'not_configured'
+            'status' => !empty($ticketmaster_key) ? 'connected' : 'not_configured',
+            'enabled' => !empty($enabled_apis['ticketmaster'])
         );
-        
-        // Check OpenRouter
-        $openrouter_key = get_option('ai_events_pro_openrouter_key', '');
+
+        // OpenRouter / AI
+        $ai_settings = get_option('ai_events_pro_ai_settings', array());
+        $openrouter_key = $ai_settings['openrouter_api_key'] ?? '';
         $status['openrouter'] = array(
             'configured' => !empty($openrouter_key),
-            'status' => !empty($openrouter_key) ? 'connected' : 'not_configured'
+            'status' => !empty($openrouter_key) ? 'connected' : 'not_configured',
+            'enabled' => !empty($ai_settings['enable_ai_features'])
+        );
+
+        // Custom
+        $status['custom'] = array(
+            'configured' => true,
+            'status' => 'connected',
+            'enabled' => !empty($enabled_apis['custom'])
         );
         
         return $status;

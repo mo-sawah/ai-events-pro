@@ -37,7 +37,7 @@ class AI_Events_Public {
             AI_EVENTS_PRO_PLUGIN_URL . 'public/js/ai-events-public.js',
             array('jquery'),
             $this->version,
-            false
+            true // load in footer
         );
 
         wp_enqueue_script(
@@ -45,14 +45,16 @@ class AI_Events_Public {
             AI_EVENTS_PRO_PLUGIN_URL . 'public/js/theme-switcher.js',
             array('jquery'),
             $this->version,
-            false
+            true // load in footer
         );
+
+        $general_settings = get_option('ai_events_pro_settings', array());
 
         wp_localize_script($this->plugin_name, 'ai_events_public', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('ai_events_public_nonce'),
-            'geolocation_enabled' => get_option('ai_events_pro_settings')['enable_geolocation'] ?? true,
-            'default_radius' => get_option('ai_events_pro_settings')['default_radius'] ?? 25,
+            'geolocation_enabled' => $general_settings['enable_geolocation'] ?? true,
+            'default_radius' => $general_settings['default_radius'] ?? 25,
             'strings' => array(
                 'loading' => __('Loading events...', 'ai-events-pro'),
                 'no_events' => __('No events found.', 'ai-events-pro'),
@@ -111,7 +113,8 @@ class AI_Events_Public {
         // Apply filters
         if (!empty($category) && $category !== 'all') {
             $events = array_filter($events, function($event) use ($category) {
-                return stripos($event['category'], $category) !== false;
+                return stripos($event['category'], $category) !== false
+                    || (!empty($event['ai_category']) && stripos($event['ai_category'], $category) !== false);
             });
         }
         
@@ -128,15 +131,15 @@ class AI_Events_Public {
             });
         }
         
-        // Apply AI enhancements if enabled
-        $settings = get_option('ai_events_pro_settings', array());
-        if (!empty($settings['enable_ai_features'])) {
-            $events = $api_manager->enhance_with_ai($events);
+        // Apply AI enhancements if enabled and configured
+        $ai_settings = get_option('ai_events_pro_ai_settings', array());
+        if (!empty($ai_settings['enable_ai_features']) && !empty($ai_settings['openrouter_api_key'])) {
+            $events = $api_manager->enhance_with_ai($events, $ai_settings);
         }
         
         // Paginate results
         $total_events = count($events);
-        $events = array_slice($events, $offset, $limit);
+        $events = array_slice(array_values($events), $offset, $limit);
         
         if (!empty($events)) {
             ob_start();
@@ -164,43 +167,50 @@ class AI_Events_Public {
             wp_send_json_error(__('Invalid theme mode.', 'ai-events-pro'));
         }
         
-        // Store preference in cookie
+        // Store preference in cookie (30 days)
         setcookie('ai_events_theme_mode', $mode, time() + (30 * 24 * 60 * 60), '/');
         
         wp_send_json_success(array('mode' => $mode));
     }
 
     public function get_user_location() {
-        // Try to get location from various sources
-        $location = '';
-        
-        // Check if location is stored in session
-        if (isset($_SESSION['ai_events_user_location'])) {
-            return $_SESSION['ai_events_user_location'];
+        // Use cookie-based caching rather than PHP sessions
+        if (!empty($_COOKIE['ai_events_user_location'])) {
+            return sanitize_text_field(wp_unslash($_COOKIE['ai_events_user_location']));
         }
-        
+
         // Try to get location from IP (basic implementation)
         $ip = $this->get_user_ip();
         if (!empty($ip)) {
             $location = $this->get_location_from_ip($ip);
-            
             if (!empty($location)) {
-                $_SESSION['ai_events_user_location'] = $location;
+                // Cache to cookie for 7 days
+                setcookie('ai_events_user_location', $location, time() + (7 * DAY_IN_SECONDS), '/');
                 return $location;
             }
         }
-        
+
         return '';
     }
 
     private function get_user_ip() {
         $ip = '';
-        
+
         if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
             $ip = $_SERVER['HTTP_CLIENT_IP'];
         } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ip = $_SERVER['HTTP_X_FORWARDED_FOR'];
-        } elseif (!empty($_SERVER['REMOTE_ADDR'])) {
+            // Can contain multiple IPs - take the first public one
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            foreach ($ips as $candidate) {
+                $candidate = trim($candidate);
+                if (filter_var($candidate, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                    $ip = $candidate;
+                    break;
+                }
+            }
+        }
+
+        if (empty($ip) && !empty($_SERVER['REMOTE_ADDR'])) {
             $ip = $_SERVER['REMOTE_ADDR'];
         }
         
@@ -208,24 +218,34 @@ class AI_Events_Public {
     }
 
     private function get_location_from_ip($ip) {
-        // Simple IP-based location detection
-        // In production, you might want to use a service like MaxMind or IP-API
-        
-        $url = "http://ip-api.com/json/{$ip}";
-        
+        // Use HTTPS provider
+        // ipapi.co supports /json/{ip}
+        $url = "https://ipapi.co/{$ip}/json/";
+
         $response = wp_remote_get($url, array('timeout' => 5));
-        
+
         if (is_wp_error($response)) {
             return '';
         }
-        
+
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
-        
-        if (isset($data['status']) && $data['status'] === 'success') {
-            return $data['city'] . ', ' . $data['regionName'];
+
+        if (!is_array($data)) {
+            return '';
         }
-        
+
+        $city = $data['city'] ?? '';
+        $region = $data['region'] ?? ($data['region_code'] ?? '');
+
+        if (!empty($city) && !empty($region)) {
+            return $city . ', ' . $region;
+        }
+
+        if (!empty($city)) {
+            return $city;
+        }
+
         return '';
     }
 
@@ -261,14 +281,20 @@ class AI_Events_Public {
         }
         
         if (!empty($event['price']) && $event['price'] !== 'Free') {
+            // Try to derive currency from price string (e.g., "USD 10.00 - 20.00")
+            $currency = 'USD';
+            if (preg_match('/^([A-Z]{3})\b/', (string)$event['price'], $m)) {
+                $currency = $m[1];
+            }
+
             $schema['offers'] = array(
                 '@type' => 'Offer',
                 'price' => $event['price'],
-                'priceCurrency' => 'USD',
+                'priceCurrency' => $currency,
                 'availability' => 'https://schema.org/InStock'
             );
         }
         
-        echo '<script type="application/ld+json">' . json_encode($schema) . '</script>';
+        echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script>';
     }
 }
