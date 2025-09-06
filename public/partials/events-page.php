@@ -15,23 +15,27 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
 ?>
 <div class="aiep ai-events-container" data-user-location="<?php echo esc_attr($user_location); ?>">
 
-  <!-- Theme Toggle -->
-  <div class="ae-theme-toggle">
-    <button id="theme-toggle" class="ae-toggle" type="button" aria-label="<?php esc_attr_e('Toggle theme', 'ai-events-pro'); ?>">
-      <svg class="ae-icon ae-icon--24 ae-toggle__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a1 1 0 0 1 1 1v1a7 7 0 1 0 7 7h1a1 1 0 1 1 0 2h-1a9 9 0 1 1-9-9V3a1 1 0 0 1 1-1z"/></svg>
-      <span class="ae-toggle__label"><?php esc_html_e('Light', 'ai-events-pro'); ?></span>
-    </button>
-  </div>
-
   <!-- Filters -->
   <section class="ae-filters" aria-labelledby="ae-filters-title">
     <div class="ae-filters__head">
-      <span class="ae-bubble" aria-hidden="true">
-        <svg class="ae-icon ae-icon--24" viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 1 5.293 13.707l4 4a1 1 0 0 1-1.414 1.414l-4-4A8 8 0 0 1 10 2zm0 2a6 6 0 1 0 .001 12.001A6 6 0 0 0 10 4z"/></svg>
-      </span>
-      <div>
-        <div id="ae-filters-title" class="ae-filters__title"><?php _e('Event Filters', 'ai-events-pro'); ?></div>
-        <div class="ae-filters__desc"><?php _e('Use location, radius, category, and source to refine your results', 'ai-events-pro'); ?></div>
+      <div class="ae-filters__head-inner">
+        <span class="ae-bubble" aria-hidden="true">
+          <svg class="ae-icon ae-icon--24" viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 1 5.293 13.707l4 4a1 1 0 0 1-1.414 1.414l-4-4A8 8 0 0 1 10 2zm0 2a6 6 0 1 0 .001 12.001A6 6 0 0 0 10 4z"/></svg>
+        </span>
+        <div class="ae-filters__titlewrap">
+          <div id="ae-filters-title" class="ae-filters__title"><?php _e('Event Filters', 'ai-events-pro'); ?></div>
+          <div class="ae-filters__desc"><?php _e('Use location, radius, category, and source to refine your results', 'ai-events-pro'); ?></div>
+        </div>
+
+        <!-- Theme toggle inside the filter box -->
+        <div class="ae-mode-toggle">
+          <button id="theme-toggle" class="ae-toggle" type="button" aria-label="<?php esc_attr_e('Toggle theme', 'ai-events-pro'); ?>">
+            <span class="ae-toggle__label">DAY MODE</span>
+            <span class="ae-toggle__iconwrap">
+              <svg class="ae-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1zm0 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm7-5a1 1 0 0 1 1 1h1a1 1 0 1 1 0 2h-1a1 1 0 1 1-2 0 1 1 0 0 1 1-1zm-14 0a1 1 0 0 1 1 1 1 1 0 1 1-2 0H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1-1zm10.95 6.364a1 1 0 0 1 1.414 0l.707.707a1 1 0 0 1-1.414 1.414l-.707-.707a1 1 0 0 1 0-1.414zM5.343 5.343a1 1 0 0 1 1.414 0l.707.707A1 1 0 0 1 6.05 7.464l-.707-.707a1 1 0 0 1 0-1.414zm0 12.728a1 1 0 0 1 1.414 0l.707.707A1 1 0 1 1 6.05 20.19l-.707-.707a1 1 0 0 1 0-1.414zm12.728-12.728a1 1 0 0 1 0 1.414l-.707.707A1 1 0 1 1 16.95 6.05l.707-.707a1 1 0 0 1 1.414 0z"/></svg>
+            </span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -47,8 +51,8 @@ $layout = isset($atts['layout']) ? $atts['layout'] : 'grid';
         </div>
       </div>
 
-      <!-- Radius -->
-      <div class="ae-field ae-field--span-3">
+      <!-- Radius (span-2 so all 4 filters fit one row) -->
+      <div class="ae-field ae-field--span-2">
         <label class="ae-label" for="radius-filter"><?php _e('Radius', 'ai-events-pro'); ?></label>
         <select id="radius-filter" class="ae-select">
           <?php

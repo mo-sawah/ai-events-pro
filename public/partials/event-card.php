@@ -38,7 +38,7 @@ $badge_class = in_array($source, array('ticketmaster','eventbrite','custom')) ? 
     <?php endif; ?>
     <h3 class="aiep-card__title"><?php echo esc_html($title); ?></h3>
     <?php if ($desc): ?>
-      <p class="aiep-card__desc"><?php echo esc_html(wp_strip_all_tags(wp_trim_words($desc, 28, '…'))); ?></p>
+      <p class="aiep-card__desc"><?php echo esc_html(wp_strip_all_tags(wp_trim_words($desc, 36, '…'))); ?></p>
     <?php endif; ?>
   </div>
 

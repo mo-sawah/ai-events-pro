@@ -85,34 +85,11 @@ body.ai-events-theme-dark .aiep {
   fill: currentColor;
 }
 
-/* Theme toggle */
-.aiep .ae-theme-toggle {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--ae-sp-3);
-}
-.aiep .ae-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ae-sp-2);
-  padding: var(--ae-sp-2) var(--ae-sp-3);
-  border: 1px solid var(--ae-border);
-  background: var(--ae-surface);
-  color: var(--ae-text);
-  border-radius: 999px;
-  cursor: pointer;
-  box-shadow: var(--ae-shadow);
-}
-.aiep .ae-toggle__label {
-  font-size: var(--ae-fs-13);
-  color: var(--ae-text-soft);
-}
-
 /* Filters card (matches your screenshot) */
 .aiep .ae-filters {
   background: var(--ae-surface);
   border: 1px solid var(--ae-border);
-  border-radius: 18px; /* slightly larger */
+  border-radius: 18px;
   box-shadow: var(--ae-shadow);
   padding: var(--ae-sp-4);
   margin-bottom: var(--ae-sp-4);
@@ -122,6 +99,12 @@ body.ai-events-theme-dark .aiep {
   align-items: center;
   gap: var(--ae-sp-3);
   margin-bottom: var(--ae-sp-3);
+}
+.aiep .ae-filters__head-inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: var(--ae-sp-3);
 }
 .aiep .ae-bubble {
   width: 40px;
@@ -133,12 +116,61 @@ body.ai-events-theme-dark .aiep {
   justify-content: center;
   color: var(--ae-primary);
 }
+.aiep .ae-filters__titlewrap {
+  flex: 1;
+  min-width: 0;
+}
 .aiep .ae-filters__title {
   font-weight: 700;
 }
 .aiep .ae-filters__desc {
   color: var(--ae-text-soft);
   font-size: var(--ae-fs-13);
+}
+
+/* Mode toggle inside the filter box */
+.aiep .ae-mode-toggle {
+  margin-left: auto;
+}
+.aiep .ae-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ae-sp-3);
+  min-width: 220px;
+  padding: 0.5rem 0.6rem 0.5rem 1rem;
+  border: 1px solid var(--ae-border);
+  background: var(--ae-surface-alt);
+  color: var(--ae-text);
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: var(--ae-shadow);
+}
+.aiep .ae-toggle__label {
+  font-size: var(--ae-fs-13);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.aiep .ae-toggle__iconwrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--ae-border);
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.aiep .ae-toggle.is-dark {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+.aiep .ae-toggle.is-dark .ae-toggle__iconwrap {
+  background: #111827;
+  color: #ffffff;
+  border-color: #1f2937;
 }
 
 /* Fields: grid */
@@ -155,10 +187,13 @@ body.ai-events-theme-dark .aiep {
 }
 .aiep .ae-field--span-4 {
   grid-column: span 4;
-}
+} /* Location */
+.aiep .ae-field--span-2 {
+  grid-column: span 2;
+} /* Radius (adjusted so all 4 fit in one row) */
 .aiep .ae-field--span-3 {
   grid-column: span 3;
-}
+} /* Category, Source */
 .aiep .ae-field--full {
   grid-column: 1 / -1;
 } /* full width row for Apply button */
@@ -173,7 +208,7 @@ body.ai-events-theme-dark .aiep {
 }
 .aiep .ae-input {
   width: 100%;
-  border-radius: 14px; /* more pill-like */
+  border-radius: 14px;
   border: 1px solid var(--ae-border);
   padding: 0.78rem 2.8rem 0.78rem 1rem;
   font-size: var(--ae-fs-14);
@@ -208,26 +243,22 @@ body.ai-events-theme-dark .aiep {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ae-primary) 14%, transparent);
 }
 
-/* Solid map-pin button inside Location input */
+/* Solid map-pin button inside Location input (as requested) */
 .aiep .ae-geo-btn {
   position: absolute;
-  right: 0.4rem;
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
-  border: 1px solid var(--ae-border);
-  background: var(--ae-surface);
-  color: var(--ae-danger); /* red pin */
-  border-radius: 12px;
+  padding: 0;
+  border: 0;
+  background: 0;
   width: 36px;
   height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--ae-danger);
   cursor: pointer;
-  box-shadow: var(--ae-shadow);
-}
-.aiep .ae-geo-btn:hover {
-  background: var(--ae-surface-alt);
 }
 
 /* Full-width Apply button row */
@@ -236,10 +267,11 @@ body.ai-events-theme-dark .aiep {
 }
 .aiep .ae-apply-row .ae-btn--primary {
   width: 100%;
-  padding: 0.9rem 1.2rem;
   border-radius: 12px;
   font-weight: 700;
   letter-spacing: 0.3px;
+  /* Requested override to beat themes */
+  padding: 2px;
 }
 
 /* Search bar under filters */
@@ -389,6 +421,8 @@ body.ai-events-theme-dark .aiep {
   font-weight: 700;
   margin-bottom: var(--ae-sp-2);
 }
+
+/* Two-line clamp for description as requested */
 .aiep .aiep-card__title {
   margin: 0 0 var(--ae-sp-2);
   font-size: clamp(16px, 1.6vw, 18px);
@@ -398,6 +432,10 @@ body.ai-events-theme-dark .aiep {
   margin: 0;
   color: var(--ae-text-soft);
   font-size: var(--ae-fs-14);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .aiep .aiep-card__meta {
@@ -445,7 +483,6 @@ body.ai-events-theme-dark .aiep {
 }
 .aiep .aiep-card__foot .ae-btn--primary {
   width: 100%;
-  padding: 0.7rem 1rem;
   border-radius: 12px;
   font-weight: 700;
 }
@@ -522,6 +559,9 @@ body.ai-events-theme-dark .aiep {
   .aiep .ae-field--span-4 {
     grid-column: span 6;
   }
+  .aiep .ae-field--span-2 {
+    grid-column: span 3;
+  }
   .aiep .ae-field--span-3 {
     grid-column: span 3;
   }
@@ -531,6 +571,7 @@ body.ai-events-theme-dark .aiep {
     grid-template-columns: repeat(2, 1fr);
   }
   .aiep .ae-field--span-4,
+  .aiep .ae-field--span-2,
   .aiep .ae-field--span-3,
   .aiep .ae-field--full {
     grid-column: span 2;

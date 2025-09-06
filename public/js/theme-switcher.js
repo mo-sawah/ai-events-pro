@@ -2,7 +2,7 @@
   function getCookie(name) {
     const m = document.cookie.match(
       new RegExp(
-        "(?:^|; )" + name.replace(/([$?*|{}\]\\^])/g, "\\$1") + "=([^;]*)"
+        "(?:^|; )" + name.replace(/([$?*|{}\\^])/g, "\\$1") + "=([^;]*)"
       )
     );
     return m ? decodeURIComponent(m[1]) : "";
@@ -18,17 +18,36 @@
       name + "=" + encodeURIComponent(value) + expires + "; path=/";
   }
 
+  var sunSVG =
+    '<svg class="ae-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V5a1 1 0 0 1 1-1zm0 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm7-5a1 1 0 0 1 1 1h1a1 1 0 1 1 0 2h-1a1 1 0 1 1-2 0 1 1 0 0 1 1-1zm-14 0a1 1 0 0 1 1 1 1 1 0 1 1-2 0H3a1 1 0 1 1 0-2h1a1 1 0 0 1 1-1zm10.95 6.364a1 1 0 0 1 1.414 0l.707.707a1 1 0 0 1-1.414 1.414l-.707-.707a1 1 0 0 1 0-1.414zM5.343 5.343a1 1 0 0 1 1.414 0l.707.707A1 1 0 0 1 6.05 7.464l-.707-.707a1 1 0 0 1 0-1.414zm0 12.728a1 1 0 0 1 1.414 0l.707.707A1 1 0 1 1 6.05 20.19l-.707-.707a1 1 0 0 1 0-1.414zm12.728-12.728a1 1 0 0 1 0 1.414l-.707.707A1 1 0 1 1 16.95 6.05l.707-.707a1 1 0 0 1 1.414 0z"/></svg>';
+  var moonSVG =
+    '<svg class="ae-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
   function applyMode(mode) {
     document.body.classList.remove(
       "ai-events-theme-dark",
       "ai-events-theme-light"
     );
-    if (mode === "dark") document.body.classList.add("ai-events-theme-dark");
-    if (mode === "light") document.body.classList.add("ai-events-theme-light");
-    var label = document.querySelector("#theme-toggle .ae-toggle__label");
-    var icon = document.querySelector("#theme-toggle .ae-toggle__icon");
-    if (label) label.textContent = mode === "dark" ? "Dark" : "Light";
-    if (icon) icon.textContent = mode === "dark" ? "🌙" : "☀️";
+    var btn = document.getElementById("theme-toggle");
+    if (mode === "dark") {
+      document.body.classList.add("ai-events-theme-dark");
+      if (btn) {
+        btn.classList.add("is-dark");
+        var label = btn.querySelector(".ae-toggle__label");
+        var icon = btn.querySelector(".ae-toggle__iconwrap");
+        if (label) label.textContent = "NIGHT MODE";
+        if (icon) icon.innerHTML = moonSVG;
+      }
+    } else {
+      document.body.classList.add("ai-events-theme-light");
+      if (btn) {
+        btn.classList.remove("is-dark");
+        var label = btn.querySelector(".ae-toggle__label");
+        var icon = btn.querySelector(".ae-toggle__iconwrap");
+        if (label) label.textContent = "DAY MODE";
+        if (icon) icon.innerHTML = sunSVG;
+      }
+    }
   }
 
   function preferred() {
@@ -57,7 +76,7 @@
       applyMode(next);
       setCookie("ai_events_theme_mode", next, 30);
 
-      // Also notify WP (optional; ignores result if admin-ajax unavailable for visitors)
+      // Optional server notify
       try {
         if (
           window.ai_events_public &&
