@@ -1,201 +1,59 @@
 <?php
 
 /**
- * Custom event management functionality.
+ * Updated Event Manager with proper AJAX handlers
  */
 class AI_Events_Event_Manager {
 
     public function __construct() {
-        add_action('wp_ajax_sync_events', array($this, 'sync_events'));
-        add_action('wp_ajax_test_api_connection', array($this, 'test_api_connection'));
-        add_action('wp_ajax_clear_events_cache', array($this, 'clear_events_cache'));
-        add_action('wp_ajax_bulk_import_events', array($this, 'bulk_import_events'));
+        // AJAX handlers are now in the Admin class
+        // This class handles business logic for events
     }
 
-    public function sync_events() {
-        check_ajax_referer('ai_events_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.'));
-        }
-        
-        $location = sanitize_text_field($_POST['location'] ?? '');
-        $radius = absint($_POST['radius'] ?? 25);
-        $limit = absint($_POST['limit'] ?? 50);
-        
-        $api_manager = new AI_Events_API_Manager();
-        $events = $api_manager->get_events($location, $radius, $limit);
-        
-        if (!empty($events)) {
-            // Cache the events
-            $api_manager->cache_events($events, $location);
-            
-            wp_send_json_success(array(
-                'message' => sprintf(__('Successfully synced %d events.', 'ai-events-pro'), count($events)),
-                'events_count' => count($events)
-            ));
-        } else {
-            wp_send_json_error(__('No events found or API error occurred.', 'ai-events-pro'));
-        }
-    }
-
-    public function test_api_connection() {
-        check_ajax_referer('ai_events_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.'));
-        }
-        
-        $api_type = sanitize_text_field($_POST['api_type']);
-        $api_key = sanitize_text_field($_POST['api_key']);
-        
-        switch ($api_type) {
-            case 'eventbrite_token':
-                $result = $this->test_eventbrite_connection($api_key);
-                break;
-            case 'ticketmaster_key':
-                $result = $this->test_ticketmaster_connection($api_key);
-                break;
-            case 'openrouter_key':
-                $result = $this->test_openrouter_connection($api_key);
-                break;
-            default:
-                wp_send_json_error(__('Invalid API type.', 'ai-events-pro'));
-                return;
-        }
-        
-        if ($result['success']) {
-            wp_send_json_success($result['message']);
-        } else {
-            wp_send_json_error($result['message']);
-        }
-    }
-
-    private function test_eventbrite_connection($token) {
-        $url = 'https://www.eventbriteapi.com/v3/users/me/';
-        
-        $response = wp_remote_get($url, array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $token
-            ),
-            'timeout' => 15
-        ));
-        
-        if (is_wp_error($response)) {
-            return array('success' => false, 'message' => $response->get_error_message());
-        }
-        
-        $status_code = wp_remote_retrieve_response_code($response);
-        
-        if ($status_code === 200) {
-            return array('success' => true, 'message' => __('Eventbrite connection successful!', 'ai-events-pro'));
-        } else {
-            return array('success' => false, 'message' => __('Eventbrite connection failed. Please check your token.', 'ai-events-pro'));
-        }
-    }
-
-    private function test_ticketmaster_connection($api_key) {
-        $url = 'https://app.ticketmaster.com/discovery/v2/events.json?apikey=' . $api_key . '&size=1';
-        
-        $response = wp_remote_get($url, array('timeout' => 15));
-        
-        if (is_wp_error($response)) {
-            return array('success' => false, 'message' => $response->get_error_message());
-        }
-        
-        $status_code = wp_remote_retrieve_response_code($response);
-        
-        if ($status_code === 200) {
-            return array('success' => true, 'message' => __('Ticketmaster connection successful!', 'ai-events-pro'));
-        } else {
-            return array('success' => false, 'message' => __('Ticketmaster connection failed. Please check your API key.', 'ai-events-pro'));
-        }
-    }
-
-    private function test_openrouter_connection($api_key) {
-        $url = 'https://openrouter.ai/api/v1/models';
-        
-        $response = wp_remote_get($url, array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $api_key
-            ),
-            'timeout' => 15
-        ));
-        
-        if (is_wp_error($response)) {
-            return array('success' => false, 'message' => $response->get_error_message());
-        }
-        
-        $status_code = wp_remote_retrieve_response_code($response);
-        
-        if ($status_code === 200) {
-            return array('success' => true, 'message' => __('OpenRouter connection successful!', 'ai-events-pro'));
-        } else {
-            return array('success' => false, 'message' => __('OpenRouter connection failed. Please check your API key.', 'ai-events-pro'));
-        }
-    }
-
-    public function clear_events_cache() {
-        check_ajax_referer('ai_events_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.'));
-        }
-        
+    public function get_events_statistics() {
         global $wpdb;
+        
+        $stats = array();
+        
+        // Total custom events
+        $custom_events_query = new WP_Query(array(
+            'post_type' => 'ai_event',
+            'post_status' => 'publish',
+            'posts_per_page' => 1,
+            'fields' => 'ids'
+        ));
+        $stats['custom_events'] = $custom_events_query->found_posts;
+        
+        // Cached events from APIs
         $table_name = $wpdb->prefix . 'ai_events_cache';
+        $cached_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE expires_at > NOW()");
+        $stats['cached_events'] = $cached_count ? $cached_count : 0;
         
-        $deleted = $wpdb->query("DELETE FROM $table_name");
+        // Events by source
+        $eventbrite_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE source = 'eventbrite' AND expires_at > NOW()");
+        $stats['eventbrite_events'] = $eventbrite_count ? $eventbrite_count : 0;
         
-        if ($deleted !== false) {
-            wp_send_json_success(sprintf(__('Cache cleared successfully. %d entries removed.', 'ai-events-pro'), $deleted));
-        } else {
-            wp_send_json_error(__('Failed to clear cache.', 'ai-events-pro'));
-        }
+        $ticketmaster_count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE source = 'ticketmaster' AND expires_at > NOW()");
+        $stats['ticketmaster_events'] = $ticketmaster_count ? $ticketmaster_count : 0;
+        
+        // Recent events (last 30 days)
+        $recent_events_query = new WP_Query(array(
+            'post_type' => 'ai_event',
+            'post_status' => 'publish',
+            'date_query' => array(
+                array(
+                    'after' => '30 days ago'
+                )
+            ),
+            'posts_per_page' => 1,
+            'fields' => 'ids'
+        ));
+        $stats['recent_events'] = $recent_events_query->found_posts;
+        
+        return $stats;
     }
 
-    public function bulk_import_events() {
-        check_ajax_referer('ai_events_admin_nonce', 'nonce');
-        
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.'));
-        }
-        
-        if (!isset($_FILES['csv_file'])) {
-            wp_send_json_error(__('No file uploaded.', 'ai-events-pro'));
-        }
-        
-        $file = $_FILES['csv_file'];
-        
-        if ($file['type'] !== 'text/csv' && $file['type'] !== 'application/vnd.ms-excel') {
-            wp_send_json_error(__('Please upload a CSV file.', 'ai-events-pro'));
-        }
-        
-        $csv_data = file_get_contents($file['tmp_name']);
-        $lines = explode("\n", $csv_data);
-        
-        if (empty($lines)) {
-            wp_send_json_error(__('The CSV file is empty.', 'ai-events-pro'));
-        }
-        
-        $headers = str_getcsv($lines[0]);
-        $imported_count = 0;
-        
-        for ($i = 1; $i < count($lines); $i++) {
-            if (empty(trim($lines[$i]))) continue;
-            
-            $row = str_getcsv($lines[$i]);
-            $event_data = array_combine($headers, $row);
-            
-            if ($this->create_event_from_csv($event_data)) {
-                $imported_count++;
-            }
-        }
-        
-        wp_send_json_success(sprintf(__('Successfully imported %d events.', 'ai-events-pro'), $imported_count));
-    }
-
-    private function create_event_from_csv($event_data) {
+    public function create_event_from_csv($event_data) {
         $required_fields = array('title', 'date');
         
         foreach ($required_fields as $field) {
@@ -241,11 +99,12 @@ class AI_Events_Event_Manager {
             $term_ids = array();
             
             foreach ($categories as $category) {
-                $term = get_term_by('name', trim($category), 'event_category');
+                $category = trim($category);
+                $term = get_term_by('name', $category, 'event_category');
                 if (!$term) {
-                    $term = wp_insert_term(trim($category), 'event_category');
-                    if (!is_wp_error($term)) {
-                        $term_ids[] = $term['term_id'];
+                    $term_result = wp_insert_term($category, 'event_category');
+                    if (!is_wp_error($term_result)) {
+                        $term_ids[] = $term_result['term_id'];
                     }
                 } else {
                     $term_ids[] = $term->term_id;
@@ -257,31 +116,162 @@ class AI_Events_Event_Manager {
             }
         }
         
-        return true;
+        return $post_id;
     }
 
-    public function get_events_statistics() {
+    public function bulk_import_events($csv_file_path) {
+        if (!file_exists($csv_file_path)) {
+            return array('success' => false, 'message' => 'CSV file not found');
+        }
+
+        $csv_data = file_get_contents($csv_file_path);
+        if (empty($csv_data)) {
+            return array('success' => false, 'message' => 'CSV file is empty');
+        }
+
+        $lines = explode("\n", $csv_data);
+        if (count($lines) < 2) {
+            return array('success' => false, 'message' => 'CSV file must have at least a header and one data row');
+        }
+
+        $headers = str_getcsv($lines[0]);
+        $imported_count = 0;
+        $errors = array();
+
+        for ($i = 1; $i < count($lines); $i++) {
+            $line = trim($lines[$i]);
+            if (empty($line)) continue;
+            
+            $row = str_getcsv($line);
+            if (count($row) !== count($headers)) {
+                $errors[] = "Line " . ($i + 1) . ": Column count mismatch";
+                continue;
+            }
+            
+            $event_data = array_combine($headers, $row);
+            
+            $result = $this->create_event_from_csv($event_data);
+            if ($result) {
+                $imported_count++;
+            } else {
+                $errors[] = "Line " . ($i + 1) . ": Failed to create event";
+            }
+        }
+
+        $message = sprintf('Successfully imported %d events.', $imported_count);
+        if (!empty($errors)) {
+            $message .= ' ' . count($errors) . ' errors occurred.';
+        }
+
+        return array(
+            'success' => true,
+            'message' => $message,
+            'imported' => $imported_count,
+            'errors' => $errors
+        );
+    }
+
+    public function export_events_csv() {
+        $events = get_posts(array(
+            'post_type' => 'ai_event',
+            'post_status' => 'publish',
+            'posts_per_page' => -1,
+            'orderby' => 'date',
+            'order' => 'DESC'
+        ));
+
+        $csv_data = array();
+        $headers = array(
+            'title', 'description', 'date', 'time', 'location', 
+            'venue', 'price', 'url', 'organizer', 'category'
+        );
+        
+        $csv_data[] = $headers;
+
+        foreach ($events as $event) {
+            $categories = get_the_terms($event->ID, 'event_category');
+            $category_names = array();
+            if ($categories && !is_wp_error($categories)) {
+                foreach ($categories as $category) {
+                    $category_names[] = $category->name;
+                }
+            }
+
+            $row = array(
+                $event->post_title,
+                wp_strip_all_tags($event->post_content),
+                get_post_meta($event->ID, '_event_date', true),
+                get_post_meta($event->ID, '_event_time', true),
+                get_post_meta($event->ID, '_event_location', true),
+                get_post_meta($event->ID, '_event_venue', true),
+                get_post_meta($event->ID, '_event_price', true),
+                get_post_meta($event->ID, '_event_url', true),
+                get_post_meta($event->ID, '_event_organizer', true),
+                implode(', ', $category_names)
+            );
+            
+            $csv_data[] = $row;
+        }
+
+        return $csv_data;
+    }
+
+    public function clean_expired_cache() {
         global $wpdb;
         
-        $stats = array();
-        
-        // Total custom events
-        $stats['custom_events'] = wp_count_posts('ai_event')->publish;
-        
-        // Cached events from APIs
         $table_name = $wpdb->prefix . 'ai_events_cache';
-        $stats['cached_events'] = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE expires_at > NOW()");
+        $deleted = $wpdb->query("DELETE FROM $table_name WHERE expires_at <= NOW()");
         
-        // Events by source
-        $stats['eventbrite_events'] = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE source = 'eventbrite' AND expires_at > NOW()");
-        $stats['ticketmaster_events'] = $wpdb->get_var("SELECT COUNT(*) FROM $table_name WHERE source = 'ticketmaster' AND expires_at > NOW()");
+        return $deleted !== false ? $deleted : 0;
+    }
+
+    public function get_api_status() {
+        $status = array();
         
-        // Recent events (last 30 days)
-        $stats['recent_events'] = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'ai_event' AND post_status = 'publish' AND post_date >= %s",
-            date('Y-m-d', strtotime('-30 days'))
-        ));
+        // Check Eventbrite
+        $eventbrite_token = get_option('ai_events_pro_eventbrite_private_token', '');
+        $status['eventbrite'] = array(
+            'configured' => !empty($eventbrite_token),
+            'status' => !empty($eventbrite_token) ? 'connected' : 'not_configured'
+        );
         
-        return $stats;
+        // Check Ticketmaster
+        $ticketmaster_key = get_option('ai_events_pro_ticketmaster_consumer_key', '');
+        $status['ticketmaster'] = array(
+            'configured' => !empty($ticketmaster_key),
+            'status' => !empty($ticketmaster_key) ? 'connected' : 'not_configured'
+        );
+        
+        // Check OpenRouter
+        $openrouter_key = get_option('ai_events_pro_openrouter_key', '');
+        $status['openrouter'] = array(
+            'configured' => !empty($openrouter_key),
+            'status' => !empty($openrouter_key) ? 'connected' : 'not_configured'
+        );
+        
+        return $status;
+    }
+
+    public function schedule_cleanup_job() {
+        if (!wp_next_scheduled('ai_events_pro_cleanup_cache')) {
+            wp_schedule_event(time(), 'daily', 'ai_events_pro_cleanup_cache');
+        }
+    }
+
+    public function unschedule_cleanup_job() {
+        wp_clear_scheduled_hook('ai_events_pro_cleanup_cache');
     }
 }
+
+// Schedule cleanup on activation
+add_action('wp', function() {
+    $event_manager = new AI_Events_Event_Manager();
+    $event_manager->schedule_cleanup_job();
+});
+
+// Handle cleanup cron job
+add_action('ai_events_pro_cleanup_cache', function() {
+    $event_manager = new AI_Events_Event_Manager();
+    $cleaned = $event_manager->clean_expired_cache();
+    error_log("AI Events Pro: Cleaned {$cleaned} expired cache entries");
+});
