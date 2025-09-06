@@ -1,5 +1,5 @@
 /**
- * AI Events Pro - Admin JavaScript
+ * AI Events Pro - Updated Admin JavaScript
  */
 
 (function ($) {
@@ -12,107 +12,120 @@
 
     init() {
       this.bindEvents();
-      this.initCharts();
-      this.initBulkActions();
+      this.initTooltips();
+
+      // Auto-restore last active tab
+      const lastTab = localStorage.getItem("ai-events-active-tab");
+      if (lastTab && $(lastTab).length) {
+        this.switchToTab(lastTab);
+      }
     }
 
     bindEvents() {
       // Tab switching
-      $(document).on("click", ".nav-tab", this.handleTabSwitch);
+      $(document).on("click", ".nav-tab", this.handleTabSwitch.bind(this));
 
       // API testing
-      $(document).on("click", ".test-api-btn", this.testApiConnection);
+      $(document).on(
+        "click",
+        ".test-api-btn",
+        this.testApiConnection.bind(this)
+      );
 
       // Event syncing
-      $(document).on("click", "#sync-events-btn", this.syncEvents);
+      $(document).on("click", "#sync-events-btn", this.syncEvents.bind(this));
 
       // Cache clearing
-      $(document).on("click", "#clear-cache-btn", this.clearCache);
-
-      // Bulk import
-      $(document).on("click", "#bulk-import-btn", this.bulkImportEvents);
+      $(document).on("click", "#clear-cache-btn", this.clearCache.bind(this));
 
       // Form validation
-      $(document).on("submit", "form", this.validateForm);
+      $(document).on("submit", "form", this.validateForm.bind(this));
 
       // Real-time validation
       $(document).on("input", 'input[type="url"]', this.validateUrl);
       $(document).on("input", 'input[type="email"]', this.validateEmail);
+      $(document).on("input", "input[required]", this.validateRequired);
 
-      // Auto-save drafts (for event creation)
-      if ($("body").hasClass("post-type-ai_event")) {
-        this.initAutoSave();
-      }
+      // Settings auto-save indicator
+      $(document).on(
+        "change",
+        "input, select, textarea",
+        this.showUnsavedChanges
+      );
     }
 
     handleTabSwitch(e) {
       e.preventDefault();
 
-      const $tab = $(this);
+      const $tab = $(e.currentTarget);
       const target = $tab.attr("href");
 
-      $(".nav-tab").removeClass("nav-tab-active");
-      $tab.addClass("nav-tab-active");
-
-      $(".tab-content").removeClass("active");
-      $(target).addClass("active");
-
-      // Save active tab to localStorage
+      this.switchToTab(target);
       localStorage.setItem("ai-events-active-tab", target);
     }
 
+    switchToTab(target) {
+      $(".nav-tab").removeClass("nav-tab-active");
+      $(`a[href="${target}"]`).addClass("nav-tab-active");
+      $(".tab-content").removeClass("active");
+      $(target).addClass("active");
+    }
+
     async testApiConnection(e) {
-      const $button = $(this);
+      const $button = $(e.currentTarget);
       const apiType = $button.data("api");
-      const $input = $button.siblings("input");
+      const optionName = $button.data("option");
+      const fieldName = $button.data("field");
+      const $input = $button.prev("input");
       const apiKey = $input.val().trim();
 
       if (!apiKey) {
-        alert(
-          ai_events_admin.strings.api_no_key || "Please enter an API key first."
-        );
+        this.showNotification("Please enter an API key first.", "error");
         return;
       }
 
-      $button
-        .prop("disabled", true)
-        .text(ai_events_admin.strings.testing_api || "Testing...")
-        .addClass("testing");
+      // Show loading state
+      const originalText = $button.text();
+      $button.prop("disabled", true).text("Testing...").addClass("testing");
 
       try {
         const response = await $.post(ajaxurl, {
           action: "test_api_connection",
           nonce: ai_events_admin.nonce,
           api_type: apiType,
+          option_name: optionName,
+          field_name: fieldName,
           api_key: apiKey,
         });
 
         if (response.success) {
+          this.showNotification(response.data, "success");
           $button.addClass("success");
-          alert(
-            ai_events_admin.strings.api_success || "Connection successful!"
-          );
+          $input.addClass("valid");
         } else {
+          this.showNotification("Connection failed: " + response.data, "error");
           $button.addClass("error");
-          alert("Error: " + response.data);
+          $input.addClass("invalid");
         }
       } catch (error) {
+        this.showNotification(
+          "Connection failed: " + error.statusText,
+          "error"
+        );
         $button.addClass("error");
-        alert("Connection failed: " + error.statusText);
       } finally {
-        $button
-          .prop("disabled", false)
-          .text(ai_events_admin.strings.test_connection || "Test Connection")
-          .removeClass("testing");
-
+        // Reset button
         setTimeout(() => {
-          $button.removeClass("success error");
+          $button
+            .prop("disabled", false)
+            .text(originalText)
+            .removeClass("testing success error");
         }, 3000);
       }
     }
 
     async syncEvents(e) {
-      const $button = $(this);
+      const $button = $(e.currentTarget);
       const $results = $("#sync-results");
 
       const location = $("#sync_location").val().trim();
@@ -120,12 +133,20 @@
       const limit = $("#sync_limit").val();
 
       if (!location) {
-        alert("Please enter a location.");
+        this.showNotification(
+          "Please enter a location to sync events.",
+          "error"
+        );
+        $("#sync_location").focus();
         return;
       }
 
-      $button.prop("disabled", true).text("Syncing...");
-      $results.removeClass("success error").empty();
+      // Show loading state
+      $button.prop("disabled", true).text("Syncing Events...");
+      $results.removeClass("success error").hide();
+
+      // Show progress indicator
+      this.showProgressIndicator("Connecting to APIs...");
 
       try {
         const response = await $.post(ajaxurl, {
@@ -136,36 +157,71 @@
           limit: limit,
         });
 
+        this.hideProgressIndicator();
+
         if (response.success) {
-          $results.addClass("success").html(`
-                        <strong>Success!</strong> ${response.data.message}
-                        <br><small>Events synced: ${
-                          response.data.events_count || 0
-                        }</small>
-                    `);
+          let html = `<div class="sync-success">
+                        <strong>✅ ${response.data.message}</strong>
+                        <p>Total events synced: ${response.data.events_count}</p>
+                    </div>`;
+
+          if (
+            response.data.events_preview &&
+            response.data.events_preview.length > 0
+          ) {
+            html +=
+              '<div class="events-preview"><h4>Preview of synced events:</h4><ul>';
+            response.data.events_preview.forEach((event) => {
+              html += `<li><strong>${event.title}</strong> - ${event.date} (${event.source})</li>`;
+            });
+            html += "</ul></div>";
+          }
+
+          $results.addClass("success").html(html).slideDown();
+          this.showNotification("Events synced successfully!", "success");
         } else {
-          $results.addClass("error").html(`
-                        <strong>Error:</strong> ${response.data}
-                    `);
+          const errorHtml = `<div class="sync-error">
+                        <strong>❌ Sync Failed</strong>
+                        <p>${response.data}</p>
+                        <details>
+                            <summary>Troubleshooting Tips</summary>
+                            <ul>
+                                <li>Check that your API credentials are correct</li>
+                                <li>Verify that you have enabled the desired event sources</li>
+                                <li>Try a different location or larger radius</li>
+                                <li>Check the error logs for more details</li>
+                            </ul>
+                        </details>
+                    </div>`;
+
+          $results.addClass("error").html(errorHtml).slideDown();
+          this.showNotification("Sync failed: " + response.data, "error");
         }
       } catch (error) {
-        $results.addClass("error").html(`
-                    <strong>Error:</strong> Failed to sync events. Please try again.
-                `);
+        this.hideProgressIndicator();
+        $results
+          .addClass("error")
+          .html(`<strong>❌ Network Error:</strong> ${error.statusText}`)
+          .slideDown();
+        this.showNotification("Network error occurred", "error");
       } finally {
         $button.prop("disabled", false).text("Sync Events Now");
       }
     }
 
     async clearCache(e) {
-      if (!confirm("Are you sure you want to clear the events cache?")) {
+      if (
+        !confirm(
+          "Are you sure you want to clear all cached events? This cannot be undone."
+        )
+      ) {
         return;
       }
 
-      const $button = $(this);
+      const $button = $(e.currentTarget);
       const $results = $("#sync-results");
 
-      $button.prop("disabled", true).text("Clearing...");
+      $button.prop("disabled", true).text("Clearing Cache...");
 
       try {
         const response = await $.post(ajaxurl, {
@@ -174,80 +230,48 @@
         });
 
         if (response.success) {
-          $results.removeClass("error").addClass("success").html(`
-                        <strong>Success!</strong> ${response.data}
-                    `);
+          $results
+            .removeClass("error")
+            .addClass("success")
+            .html(`<strong>✅ ${response.data}</strong>`)
+            .slideDown();
+          this.showNotification("Cache cleared successfully!", "success");
         } else {
-          $results.removeClass("success").addClass("error").html(`
-                        <strong>Error:</strong> ${response.data}
-                    `);
+          $results
+            .removeClass("success")
+            .addClass("error")
+            .html(`<strong>❌ Error:</strong> ${response.data}`)
+            .slideDown();
+          this.showNotification("Failed to clear cache", "error");
         }
       } catch (error) {
-        $results.removeClass("success").addClass("error").html(`
-                    <strong>Error:</strong> Failed to clear cache.
-                `);
+        $results
+          .removeClass("success")
+          .addClass("error")
+          .html(`<strong>❌ Error:</strong> Network error occurred`)
+          .slideDown();
+        this.showNotification("Network error occurred", "error");
       } finally {
         $button.prop("disabled", false).text("Clear Cache");
       }
     }
 
-    bulkImportEvents(e) {
-      const $button = $(this);
-      const $fileInput = $("#csv_file");
-      const file = $fileInput[0].files[0];
-
-      if (!file) {
-        alert("Please select a CSV file.");
-        return;
-      }
-
-      if (!file.name.toLowerCase().endsWith(".csv")) {
-        alert("Please select a valid CSV file.");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("action", "bulk_import_events");
-      formData.append("nonce", ai_events_admin.nonce);
-      formData.append("csv_file", file);
-
-      $button.prop("disabled", true).text("Importing...");
-
-      $.ajax({
-        url: ajaxurl,
-        type: "POST",
-        data: formData,
-        processData: false,
-        contentType: false,
-        success: function (response) {
-          if (response.success) {
-            alert("Import successful: " + response.data);
-            location.reload();
-          } else {
-            alert("Import failed: " + response.data);
-          }
-        },
-        error: function () {
-          alert("Import failed. Please try again.");
-        },
-        complete: function () {
-          $button.prop("disabled", false).text("Import Events");
-        },
-      });
-    }
-
     validateForm(e) {
-      const $form = $(this);
+      const $form = $(e.currentTarget);
       let isValid = true;
+      let firstInvalidField = null;
 
       // Validate required fields
       $form.find("[required]").each(function () {
         const $field = $(this);
         if (!$field.val().trim()) {
-          $field.addClass("error");
+          $field.addClass("invalid");
           isValid = false;
+          if (!firstInvalidField) {
+            firstInvalidField = $field;
+          }
         } else {
-          $field.removeClass("error");
+          $field.removeClass("invalid");
         }
       });
 
@@ -257,117 +281,154 @@
         const url = $field.val().trim();
 
         if (url && !isValidUrl(url)) {
-          $field.addClass("error");
+          $field.addClass("invalid");
           isValid = false;
+          if (!firstInvalidField) {
+            firstInvalidField = $field;
+          }
         } else {
-          $field.removeClass("error");
+          $field.removeClass("invalid");
+        }
+      });
+
+      // Validate emails
+      $form.find('input[type="email"]').each(function () {
+        const $field = $(this);
+        const email = $field.val().trim();
+
+        if (email && !isValidEmail(email)) {
+          $field.addClass("invalid");
+          isValid = false;
+          if (!firstInvalidField) {
+            firstInvalidField = $field;
+          }
+        } else {
+          $field.removeClass("invalid");
         }
       });
 
       if (!isValid) {
         e.preventDefault();
-        alert("Please correct the highlighted fields.");
+        this.showNotification(
+          "Please correct the highlighted fields.",
+          "error"
+        );
+        if (firstInvalidField) {
+          firstInvalidField.focus();
+        }
       }
+
+      return isValid;
     }
 
     validateUrl(e) {
-      const $field = $(this);
+      const $field = $(e.currentTarget);
       const url = $field.val().trim();
 
       if (url && !isValidUrl(url)) {
-        $field.addClass("error");
+        $field.addClass("invalid");
       } else {
-        $field.removeClass("error");
+        $field.removeClass("invalid");
       }
     }
 
     validateEmail(e) {
-      const $field = $(this);
+      const $field = $(e.currentTarget);
       const email = $field.val().trim();
 
       if (email && !isValidEmail(email)) {
-        $field.addClass("error");
+        $field.addClass("invalid");
       } else {
-        $field.removeClass("error");
+        $field.removeClass("invalid");
       }
     }
 
-    initAutoSave() {
-      let autoSaveTimer;
+    validateRequired(e) {
+      const $field = $(e.currentTarget);
 
-      $("input, textarea, select").on(
-        "input change",
-        function () {
-          clearTimeout(autoSaveTimer);
-          autoSaveTimer = setTimeout(() => {
-            this.autoSave();
-          }, 30000); // Auto-save every 30 seconds
-        }.bind(this)
+      if ($field.val().trim()) {
+        $field.removeClass("invalid");
+      }
+    }
+
+    showUnsavedChanges() {
+      if (!$(".unsaved-changes-notice").length) {
+        $('<div class="unsaved-changes-notice">You have unsaved changes.</div>')
+          .prependTo(".wrap")
+          .hide()
+          .slideDown();
+      }
+    }
+
+    showNotification(message, type = "info") {
+      const $notification = $(`
+                <div class="ai-events-notification ${type}">
+                    <span class="message">${message}</span>
+                    <button type="button" class="close-notification">&times;</button>
+                </div>
+            `);
+
+      $("body").append($notification);
+
+      setTimeout(() => $notification.addClass("show"), 100);
+
+      // Auto-remove after 5 seconds
+      const timeout = setTimeout(
+        () => this.removeNotification($notification),
+        5000
       );
-    }
 
-    autoSave() {
-      // WordPress already has auto-save functionality
-      // This is just a placeholder for custom auto-save logic
-      if (wp.autosave) {
-        wp.autosave.server.triggerSave();
-      }
-    }
-
-    initCharts() {
-      // Initialize dashboard charts if Chart.js is available
-      if (typeof Chart !== "undefined" && $("#events-chart").length) {
-        this.initEventsChart();
-      }
-    }
-
-    initEventsChart() {
-      const ctx = document.getElementById("events-chart").getContext("2d");
-
-      // This would be populated with real data from PHP
-      const chartData = {
-        labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-        datasets: [
-          {
-            label: "Events Added",
-            data: [12, 19, 3, 5, 2, 3],
-            borderColor: "rgb(59, 130, 246)",
-            backgroundColor: "rgba(59, 130, 246, 0.1)",
-            tension: 0.4,
-          },
-        ],
-      };
-
-      new Chart(ctx, {
-        type: "line",
-        data: chartData,
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              position: "top",
-            },
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-            },
-          },
-        },
+      // Manual close
+      $notification.find(".close-notification").on("click", () => {
+        clearTimeout(timeout);
+        this.removeNotification($notification);
       });
     }
 
-    initBulkActions() {
-      $("#doaction, #doaction2").click(function (e) {
-        const action = $(this).prev("select").val();
+    removeNotification($notification) {
+      $notification.addClass("hide");
+      setTimeout(() => $notification.remove(), 300);
+    }
 
-        if (action === "delete") {
-          if (
-            !confirm("Are you sure you want to delete the selected events?")
-          ) {
-            e.preventDefault();
-          }
-        }
+    showProgressIndicator(message) {
+      const $indicator = $(`
+                <div class="ai-events-progress">
+                    <div class="progress-spinner"></div>
+                    <span class="progress-message">${message}</span>
+                </div>
+            `);
+
+      $("body").append($indicator);
+      setTimeout(() => $indicator.addClass("show"), 100);
+    }
+
+    hideProgressIndicator() {
+      $(".ai-events-progress").addClass("hide");
+      setTimeout(() => $(".ai-events-progress").remove(), 300);
+    }
+
+    initTooltips() {
+      $("[data-tooltip]").each(function () {
+        const $element = $(this);
+        const tooltip = $element.data("tooltip");
+
+        $element.on("mouseenter", function () {
+          const $tooltip = $(`<div class="ai-events-tooltip">${tooltip}</div>`);
+          $("body").append($tooltip);
+
+          const offset = $element.offset();
+          $tooltip.css({
+            top: offset.top - $tooltip.outerHeight() - 5,
+            left:
+              offset.left +
+              $element.outerWidth() / 2 -
+              $tooltip.outerWidth() / 2,
+          });
+        });
+
+        $element.on("mouseleave", function () {
+          $(".ai-events-tooltip").remove();
+        });
       });
     }
   }
@@ -391,10 +452,197 @@
   $(document).ready(function () {
     new AIEventsAdmin();
 
-    // Restore active tab from localStorage
-    const activeTab = localStorage.getItem("ai-events-active-tab");
-    if (activeTab) {
-      $('.nav-tab[href="' + activeTab + '"]').click();
-    }
+    // Remove unsaved changes notice when form is submitted
+    $(document).on("submit", "form", function () {
+      $(".unsaved-changes-notice").remove();
+    });
   });
 })(jQuery);
+
+// Add CSS for notifications and progress indicators
+const adminStyles = `
+<style>
+.ai-events-notification {
+    position: fixed;
+    top: 32px;
+    right: 20px;
+    background: #fff;
+    border-left: 4px solid #0073aa;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    max-width: 400px;
+    z-index: 100000;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+}
+
+.ai-events-notification.show {
+    transform: translateX(0);
+}
+
+.ai-events-notification.hide {
+    transform: translateX(100%);
+}
+
+.ai-events-notification.success {
+    border-left-color: #46b450;
+}
+
+.ai-events-notification.error {
+    border-left-color: #dc3232;
+}
+
+.ai-events-notification .close-notification {
+    background: none;
+    border: none;
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    font-size: 16px;
+    cursor: pointer;
+    color: #666;
+}
+
+.ai-events-progress {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 20px 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    z-index: 100001;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.ai-events-progress.show {
+    opacity: 1;
+}
+
+.ai-events-progress.hide {
+    opacity: 0;
+}
+
+.progress-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid transparent;
+    border-top: 2px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.unsaved-changes-notice {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 12px 20px;
+    margin: 20px 0;
+    border-radius: 4px;
+}
+
+.test-api-btn.testing {
+    opacity: 0.6;
+}
+
+.test-api-btn.success {
+    background: #46b450;
+    border-color: #46b450;
+    color: white;
+}
+
+.test-api-btn.error {
+    background: #dc3232;
+    border-color: #dc3232;
+    color: white;
+}
+
+input.invalid {
+    border-color: #dc3232 !important;
+    box-shadow: 0 0 0 1px #dc3232;
+}
+
+input.valid {
+    border-color: #46b450 !important;
+    box-shadow: 0 0 0 1px #46b450;
+}
+
+.ai-events-tooltip {
+    position: absolute;
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 100000;
+    white-space: nowrap;
+}
+
+.sync-success, .sync-error {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+}
+
+.sync-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.sync-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.events-preview {
+    margin-top: 15px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 4px;
+}
+
+.events-preview h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+}
+
+.events-preview ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.events-preview li {
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+details {
+    margin-top: 10px;
+}
+
+summary {
+    cursor: pointer;
+    font-weight: bold;
+}
+
+details ul {
+    margin-top: 10px;
+    padding-left: 20px;
+}
+</style>
+`;
+
+document.head.insertAdjacentHTML("beforeend", adminStyles);

@@ -1,44 +1,51 @@
 <?php
 
 /**
- * API integration manager.
+ * Updated API manager with proper settings handling
  */
 class AI_Events_API_Manager {
 
     private $eventbrite_api;
     private $ticketmaster_api;
-    private $openrouter_api_key;
     
     public function __construct() {
         $this->eventbrite_api = new AI_Events_Eventbrite_API();
         $this->ticketmaster_api = new AI_Events_Ticketmaster_API();
-        $this->openrouter_api_key = get_option('ai_events_pro_openrouter_key', '');
     }
     
     public function get_events($location = '', $radius = 25, $limit = 20) {
         $all_events = array();
-        $settings = get_option('ai_events_pro_settings', array());
+        $general_settings = get_option('ai_events_pro_settings', array());
+        $enabled_apis = $general_settings['enabled_apis'] ?? array();
         
-        // Get events from Eventbrite
-        if (!empty($settings['enable_eventbrite'])) {
+        // Get events from Eventbrite if enabled
+        if (!empty($enabled_apis['eventbrite'])) {
             $eventbrite_events = $this->eventbrite_api->get_events($location, $radius, $limit);
             if ($eventbrite_events) {
                 $all_events = array_merge($all_events, $eventbrite_events);
             }
         }
         
-        // Get events from Ticketmaster
-        if (!empty($settings['enable_ticketmaster'])) {
+        // Get events from Ticketmaster if enabled
+        if (!empty($enabled_apis['ticketmaster'])) {
             $ticketmaster_events = $this->ticketmaster_api->get_events($location, $radius, $limit);
             if ($ticketmaster_events) {
                 $all_events = array_merge($all_events, $ticketmaster_events);
             }
         }
         
-        // Get custom events
-        $custom_events = $this->get_custom_events($location);
-        if ($custom_events) {
-            $all_events = array_merge($all_events, $custom_events);
+        // Get custom events if enabled
+        if (!empty($enabled_apis['custom'])) {
+            $custom_events = $this->get_custom_events($location);
+            if ($custom_events) {
+                $all_events = array_merge($all_events, $custom_events);
+            }
+        }
+        
+        // Apply AI enhancements if enabled
+        $ai_settings = get_option('ai_events_pro_ai_settings', array());
+        if (!empty($ai_settings['enable_ai_features']) && !empty($ai_settings['openrouter_api_key'])) {
+            $all_events = $this->enhance_with_ai($all_events, $ai_settings);
         }
         
         // Sort events by date
@@ -72,7 +79,7 @@ class AI_Events_API_Manager {
             $formatted_events[] = array(
                 'id' => $event->ID,
                 'title' => $event->post_title,
-                'description' => $event->post_content,
+                'description' => wp_strip_all_tags($event->post_content),
                 'date' => get_post_meta($event->ID, '_event_date', true),
                 'time' => get_post_meta($event->ID, '_event_time', true),
                 'location' => get_post_meta($event->ID, '_event_location', true),
@@ -81,93 +88,88 @@ class AI_Events_API_Manager {
                 'url' => get_post_meta($event->ID, '_event_url', true),
                 'image' => get_the_post_thumbnail_url($event->ID, 'large'),
                 'source' => 'custom',
-                'category' => get_the_terms($event->ID, 'event_category')
+                'category' => $this->get_event_categories($event->ID),
+                'organizer' => get_post_meta($event->ID, '_event_organizer', true)
             );
         }
         
         return $formatted_events;
     }
     
-    public function enhance_with_ai($events) {
-        if (empty($this->openrouter_api_key) || empty($events)) {
+    private function get_event_categories($post_id) {
+        $categories = get_the_terms($post_id, 'event_category');
+        if ($categories && !is_wp_error($categories)) {
+            return $categories[0]->name;
+        }
+        return 'Other';
+    }
+    
+    public function enhance_with_ai($events, $ai_settings) {
+        if (empty($ai_settings['openrouter_api_key']) || empty($events)) {
             return $events;
         }
         
         foreach ($events as &$event) {
-            // AI-powered event categorization
-            $event['ai_category'] = $this->categorize_event($event);
-            
-            // AI-powered event recommendations
-            $event['ai_score'] = $this->calculate_relevance_score($event);
-            
-            // AI-generated event summary
-            if (strlen($event['description']) > 500) {
-                $event['ai_summary'] = $this->generate_summary($event['description']);
+            if (!empty($ai_settings['ai_categorization'])) {
+                $event['ai_category'] = $this->categorize_event($event, $ai_settings['openrouter_api_key']);
             }
+            
+            if (!empty($ai_settings['ai_summaries']) && strlen($event['description']) > 300) {
+                $event['ai_summary'] = $this->generate_summary($event['description'], $ai_settings['openrouter_api_key']);
+            }
+            
+            $event['ai_score'] = $this->calculate_relevance_score($event);
         }
         
         return $events;
     }
     
-    private function categorize_event($event) {
-        $prompt = "Categorize this event into one of these categories: Music, Sports, Arts & Culture, Food & Drink, Business, Health & Wellness, Technology, Education, Family, Other. Event: " . $event['title'] . " - " . substr($event['description'], 0, 200);
+    private function categorize_event($event, $api_key) {
+        $prompt = "Categorize this event into one category: Music, Sports, Arts, Food, Business, Health, Technology, Education, Family, or Other. Event: " . $event['title'];
         
-        return $this->call_openrouter_api($prompt, 'category');
+        return $this->call_openrouter_api($prompt, $api_key, 20);
+    }
+    
+    private function generate_summary($description, $api_key) {
+        $prompt = "Summarize this event description in 1-2 sentences: " . substr($description, 0, 500);
+        
+        return $this->call_openrouter_api($prompt, $api_key, 150);
     }
     
     private function calculate_relevance_score($event) {
-        // Simple scoring algorithm - can be enhanced with AI
-        $score = 50; // Base score
+        $score = 50;
         
-        // Boost score for events happening soon
+        if (!empty($event['image'])) $score += 10;
+        if (!empty($event['price'])) $score += 5;
+        if (!empty($event['venue'])) $score += 5;
+        
         $days_until = (strtotime($event['date']) - time()) / (24 * 60 * 60);
-        if ($days_until <= 7) {
-            $score += 20;
-        } elseif ($days_until <= 30) {
-            $score += 10;
-        }
+        if ($days_until <= 7) $score += 20;
+        elseif ($days_until <= 30) $score += 10;
         
-        // Boost score for events with images
-        if (!empty($event['image'])) {
-            $score += 10;
-        }
-        
-        return min(100, $score);
+        return min(100, max(0, $score));
     }
     
-    private function generate_summary($description) {
-        $prompt = "Summarize this event description in 2-3 sentences: " . substr($description, 0, 1000);
-        
-        return $this->call_openrouter_api($prompt, 'summary');
-    }
-    
-    private function call_openrouter_api($prompt, $type = 'general') {
+    private function call_openrouter_api($prompt, $api_key, $max_tokens = 100) {
         $url = 'https://openrouter.ai/api/v1/chat/completions';
         
         $data = array(
             'model' => 'openai/gpt-3.5-turbo',
             'messages' => array(
-                array(
-                    'role' => 'user',
-                    'content' => $prompt
-                )
+                array('role' => 'user', 'content' => $prompt)
             ),
-            'max_tokens' => $type === 'category' ? 50 : 200,
+            'max_tokens' => $max_tokens,
             'temperature' => 0.7
         );
         
-        $args = array(
+        $response = wp_remote_post($url, array(
             'headers' => array(
-                'Authorization' => 'Bearer ' . $this->openrouter_api_key,
-                'Content-Type' => 'application/json',
-                'HTTP-Referer' => site_url(),
-                'X-Title' => 'AI Events Pro'
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type' => 'application/json'
             ),
             'body' => json_encode($data),
             'timeout' => 30
-        );
-        
-        $response = wp_remote_post($url, $args);
+        ));
         
         if (is_wp_error($response)) {
             return '';
@@ -176,18 +178,17 @@ class AI_Events_API_Manager {
         $body = wp_remote_retrieve_body($response);
         $decoded = json_decode($body, true);
         
-        if (isset($decoded['choices'][0]['message']['content'])) {
-            return trim($decoded['choices'][0]['message']['content']);
-        }
-        
-        return '';
+        return isset($decoded['choices'][0]['message']['content']) 
+            ? trim($decoded['choices'][0]['message']['content']) 
+            : '';
     }
     
     public function cache_events($events, $location = '') {
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'ai_events_cache';
-        $cache_duration = get_option('ai_events_pro_settings')['cache_duration'] ?? 3600;
+        $general_settings = get_option('ai_events_pro_settings', array());
+        $cache_duration = $general_settings['cache_duration'] ?? 3600;
         $expires_at = date('Y-m-d H:i:s', time() + $cache_duration);
         
         foreach ($events as $event) {
