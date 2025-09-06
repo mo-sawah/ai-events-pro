@@ -28,6 +28,115 @@ class AI_Events_Admin {
         add_action('wp_ajax_save_shortcode_preset', array($this, 'ajax_save_shortcode_preset'));
         add_action('wp_ajax_delete_shortcode_preset', array($this, 'ajax_delete_shortcode_preset'));
         add_action('wp_ajax_preview_shortcode', array($this, 'ajax_preview_shortcode'));
+
+        add_action('admin_init', array($this, 'register_settings'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+    }
+
+    public function enqueue_admin_assets($hook) {
+        // Load WordPress color picker on your settings page
+        if (strpos($hook, 'ai-events') !== false || strpos($hook, 'ai_events') !== false) {
+            wp_enqueue_style('wp-color-picker');
+            wp_enqueue_script('wp-color-picker');
+        }
+    }
+
+    public function register_settings() {
+        register_setting('ai_events_pro_settings_group', 'ai_events_pro_settings');
+
+        // Section: Appearance
+        add_settings_section(
+            'ai_events_pro_appearance',
+            __('Appearance', 'ai-events-pro'),
+            '__return_false',
+            'ai_events_pro_settings'
+        );
+
+        // Default Theme Mode
+        add_settings_field(
+            'default_theme_mode',
+            __('Default Theme Mode', 'ai-events-pro'),
+            function () {
+                $s = get_option('ai_events_pro_settings', array());
+                $val = isset($s['default_theme_mode']) ? $s['default_theme_mode'] : 'auto';
+                ?>
+                <select name="ai_events_pro_settings[default_theme_mode]">
+                    <option value="auto"  <?php selected($val, 'auto');  ?>><?php _e('Auto (Follow system)', 'ai-events-pro'); ?></option>
+                    <option value="light" <?php selected($val, 'light'); ?>><?php _e('Light', 'ai-events-pro'); ?></option>
+                    <option value="dark"  <?php selected($val, 'dark');  ?>><?php _e('Dark', 'ai-events-pro'); ?></option>
+                </select>
+                <?php
+            },
+            'ai_events_pro_settings',
+            'ai_events_pro_appearance'
+        );
+
+        // Colors (Light)
+        add_settings_field(
+            'colors_light',
+            __('Colors (Light Mode)', 'ai-events-pro'),
+            array($this, 'render_colors_light'),
+            'ai_events_pro_settings',
+            'ai_events_pro_appearance'
+        );
+
+        // Colors (Dark)
+        add_settings_field(
+            'colors_dark',
+            __('Colors (Dark Mode)', 'ai-events-pro'),
+            array($this, 'render_colors_dark'),
+            'ai_events_pro_settings',
+            'ai_events_pro_appearance'
+        );
+    }
+
+    private function color_input($name, $label, $value, $fallback) {
+        $val = $value ?: $fallback;
+        ?>
+        <label style="display:inline-flex;align-items:center;gap:.5rem;margin:.25rem .75rem .25rem 0;">
+            <span style="min-width:140px;display:inline-block;"><?php echo esc_html($label); ?></span>
+            <input type="text" class="ai-ep-color-field" data-default-color="<?php echo esc_attr($fallback); ?>"
+                   name="ai_events_pro_settings[<?php echo esc_attr($name); ?>]" value="<?php echo esc_attr($val); ?>"/>
+        </label>
+        <?php
+    }
+
+    public function render_colors_light() {
+        $s = get_option('ai_events_pro_settings', array());
+        echo '<div>';
+        $this->color_input('colors_light[primary]',       __('Primary', 'ai-events-pro'),       $s['colors_light']['primary']       ?? '', '#2563eb');
+        $this->color_input('colors_light[primary_600]',   __('Primary 600', 'ai-events-pro'),   $s['colors_light']['primary_600']   ?? '', '#1d4ed8');
+        $this->color_input('colors_light[text]',          __('Text', 'ai-events-pro'),          $s['colors_light']['text']          ?? '', '#0f172a');
+        $this->color_input('colors_light[text_soft]',     __('Text (Soft)', 'ai-events-pro'),   $s['colors_light']['text_soft']     ?? '', '#475569');
+        $this->color_input('colors_light[bg]',            __('Background', 'ai-events-pro'),    $s['colors_light']['bg']            ?? '', '#f5f7fb');
+        $this->color_input('colors_light[surface]',       __('Surface', 'ai-events-pro'),       $s['colors_light']['surface']       ?? '', '#ffffff');
+        $this->color_input('colors_light[surface_alt]',   __('Surface Alt', 'ai-events-pro'),   $s['colors_light']['surface_alt']   ?? '', '#f8fafc');
+        $this->color_input('colors_light[border]',        __('Border', 'ai-events-pro'),        $s['colors_light']['border']        ?? '', '#e5e7eb');
+        echo '</div>';
+        ?>
+        <script>
+          jQuery(function($){ $('.ai-ep-color-field').wpColorPicker(); });
+        </script>
+        <?php
+    }
+
+    public function render_colors_dark() {
+        $s = get_option('ai_events_pro_settings', array());
+        echo '<div>';
+        $this->color_input('colors_dark[primary]',       __('Primary', 'ai-events-pro'),       $s['colors_dark']['primary']       ?? '', '#60a5fa');
+        $this->color_input('colors_dark[primary_600]',   __('Primary 600', 'ai-events-pro'),   $s['colors_dark']['primary_600']   ?? '', '#3b82f6');
+        $this->color_input('colors_dark[text]',          __('Text', 'ai-events-pro'),          $s['colors_dark']['text']          ?? '', '#e5e7eb');
+        $this->color_input('colors_dark[text_soft]',     __('Text (Soft)', 'ai-events-pro'),   $s['colors_dark']['text_soft']     ?? '', '#cbd5e1');
+        $this->color_input('colors_dark[bg]',            __('Background', 'ai-events-pro'),    $s['colors_dark']['bg']            ?? '', '#0f172a');
+        $this->color_input('colors_dark[surface]',       __('Surface', 'ai-events-pro'),       $s['colors_dark']['surface']       ?? '', '#111827');
+        $this->color_input('colors_dark[surface_alt]',   __('Surface Alt', 'ai-events-pro'),   $s['colors_dark']['surface_alt']   ?? '', '#0b1220');
+        $this->color_input('colors_dark[border]',        __('Border', 'ai-events-pro'),        $s['colors_dark']['border']        ?? '', '#273244');
+        echo '</div>';
+        ?>
+        <script>
+          jQuery(function($){ $('.ai-ep-color-field').wpColorPicker(); });
+        </script>
+        <?php
     }
 
     /**
@@ -383,11 +492,11 @@ class AI_Events_Admin {
     // Validation
     public function validate_general_settings($input) {
         $out = array();
-        $out['events_per_page']  = max(1, min(50, absint($input['events_per_page'] ?? 12)));
-        $out['default_radius']   = max(1, min(500, absint($input['default_radius'] ?? 25)));
-        $out['cache_duration']   = max(1, absint($input['cache_duration'] ?? 1)) * 3600;
+        $out['events_per_page']    = max(1, min(50, absint($input['events_per_page'] ?? 12)));
+        $out['default_radius']     = max(1, min(500, absint($input['default_radius'] ?? 25)));
+        $out['cache_duration']     = max(1, absint($input['cache_duration'] ?? 1)) * 3600;
         $out['enable_geolocation'] = !empty($input['enable_geolocation']);
-        $out['enabled_apis'] = array();
+        $out['enabled_apis']       = array();
         if (!empty($input['enabled_apis']) && is_array($input['enabled_apis'])) {
             foreach ($input['enabled_apis'] as $api => $enabled) {
                 $out['enabled_apis'][$api] = !empty($enabled);

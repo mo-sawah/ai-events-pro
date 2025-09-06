@@ -42,10 +42,10 @@
       document.body.classList.add("ai-events-theme-light");
       if (btn) {
         btn.classList.remove("is-dark");
-        var label = btn.querySelector(".ae-toggle__label");
-        var icon = btn.querySelector(".ae-toggle__iconwrap");
-        if (label) label.textContent = "DAY MODE";
-        if (icon) icon.innerHTML = sunSVG;
+        var label2 = btn.querySelector(".ae-toggle__label");
+        var icon2 = btn.querySelector(".ae-toggle__iconwrap");
+        if (label2) label2.textContent = "DAY MODE";
+        if (icon2) icon2.innerHTML = sunSVG;
       }
     }
   }
@@ -61,9 +61,21 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    var saved = getCookie("ai_events_theme_mode") || "auto";
-    var mode = saved === "auto" ? preferred() : saved;
-    applyMode(mode);
+    // Respect saved cookie; otherwise fall back to admin setting (default_mode), otherwise system preference
+    var saved = getCookie("ai_events_theme_mode"); // may be undefined
+    var defaultMode =
+      window.ai_events_public && ai_events_public.default_mode
+        ? ai_events_public.default_mode
+        : "auto";
+    var startMode = saved
+      ? saved === "auto"
+        ? preferred()
+        : saved
+      : defaultMode === "auto"
+      ? preferred()
+      : defaultMode;
+
+    applyMode(startMode);
 
     var btn = document.getElementById("theme-toggle");
     if (!btn) return;
@@ -76,7 +88,7 @@
       applyMode(next);
       setCookie("ai_events_theme_mode", next, 30);
 
-      // Optional server notify
+      // Optional server notify (will no-op for visitors if action isn’t registered server-side)
       try {
         if (
           window.ai_events_public &&

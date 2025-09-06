@@ -11,6 +11,10 @@ class AI_Events_Public {
     public function __construct($plugin_name, $version) {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
+
+        // Enqueue both styles and scripts on the frontend
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_styles'));
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
     }
 
     public function enqueue_styles() {
@@ -29,6 +33,35 @@ class AI_Events_Public {
             $this->version,
             'all'
         );
+
+        // Inject color variables (light and dark) from settings so the whole UI is themeable
+        $settings = get_option('ai_events_pro_settings', array());
+        $light = isset($settings['colors_light']) ? (array)$settings['colors_light'] : array();
+        $dark  = isset($settings['colors_dark'])  ? (array)$settings['colors_dark']  : array();
+
+        $css = '
+        .aiep{
+          --ae-primary:      ' . esc_attr($light['primary']      ?? '#2563eb') . ';
+          --ae-primary-600:  ' . esc_attr($light['primary_600']  ?? '#1d4ed8') . ';
+          --ae-text:         ' . esc_attr($light['text']         ?? '#0f172a') . ';
+          --ae-text-soft:    ' . esc_attr($light['text_soft']    ?? '#475569') . ';
+          --ae-bg:           ' . esc_attr($light['bg']           ?? '#f5f7fb') . ';
+          --ae-surface:      ' . esc_attr($light['surface']      ?? '#ffffff') . ';
+          --ae-surface-alt:  ' . esc_attr($light['surface_alt']  ?? '#f8fafc') . ';
+          --ae-border:       ' . esc_attr($light['border']       ?? '#e5e7eb') . ';
+        }
+        body.ai-events-theme-dark .aiep{
+          --ae-primary:      ' . esc_attr($dark['primary']       ?? '#60a5fa') . ';
+          --ae-primary-600:  ' . esc_attr($dark['primary_600']   ?? '#3b82f6') . ';
+          --ae-text:         ' . esc_attr($dark['text']          ?? '#e5e7eb') . ';
+          --ae-text-soft:    ' . esc_attr($dark['text_soft']     ?? '#cbd5e1') . ';
+          --ae-bg:           ' . esc_attr($dark['bg']            ?? '#0f172a') . ';
+          --ae-surface:      ' . esc_attr($dark['surface']       ?? '#111827') . ';
+          --ae-surface-alt:  ' . esc_attr($dark['surface_alt']   ?? '#0b1220') . ';
+          --ae-border:       ' . esc_attr($dark['border']        ?? '#273244') . ';
+        }';
+
+        wp_add_inline_style($this->plugin_name, $css);
     }
 
     public function enqueue_scripts() {
@@ -49,18 +82,22 @@ class AI_Events_Public {
         );
 
         $general_settings = get_option('ai_events_pro_settings', array());
+        $events_per_page  = isset($general_settings['events_per_page']) ? max(1, (int)$general_settings['events_per_page']) : 12;
+        $default_mode     = isset($general_settings['default_theme_mode']) ? $general_settings['default_theme_mode'] : 'auto';
 
         wp_localize_script($this->plugin_name, 'ai_events_public', array(
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('ai_events_public_nonce'),
+            'ajax_url'            => admin_url('admin-ajax.php'),
+            'nonce'               => wp_create_nonce('ai_events_public_nonce'),
             'geolocation_enabled' => $general_settings['enable_geolocation'] ?? true,
-            'default_radius' => $general_settings['default_radius'] ?? 25,
-            'strings' => array(
-                'loading' => __('Loading events...', 'ai-events-pro'),
-                'no_events' => __('No events found.', 'ai-events-pro'),
+            'default_radius'      => $general_settings['default_radius'] ?? 25,
+            'per_page'            => $events_per_page,
+            'default_mode'        => $default_mode,
+            'strings'             => array(
+                'loading'        => __('Loading events...', 'ai-events-pro'),
+                'no_events'      => __('No events found.', 'ai-events-pro'),
                 'location_error' => __('Unable to get your location. Please enter a location manually.', 'ai-events-pro'),
-                'load_more' => __('Load More Events', 'ai-events-pro'),
-                'show_less' => __('Show Less', 'ai-events-pro')
+                'load_more'      => __('Load More Events', 'ai-events-pro'),
+                'show_less'      => __('Show Less', 'ai-events-pro')
             )
         ));
     }
@@ -73,85 +110,108 @@ class AI_Events_Public {
 
     public function add_body_classes($classes) {
         $classes[] = 'ai-events-page';
-        
+
         $settings = get_option('ai_events_pro_settings', array());
         $theme_mode = $settings['theme_mode'] ?? 'auto';
-        
+
         if ($theme_mode !== 'auto') {
             $classes[] = 'ai-events-theme-' . $theme_mode;
         }
-        
+
         return $classes;
     }
 
     public function ajax_get_events() {
         check_ajax_referer('ai_events_public_nonce', 'nonce');
-        
+
         $location = sanitize_text_field($_POST['location'] ?? '');
-        $radius = absint($_POST['radius'] ?? 25);
-        $limit = absint($_POST['limit'] ?? 12);
-        $offset = absint($_POST['offset'] ?? 0);
+        $radius   = absint($_POST['radius'] ?? 25);
+        $limit    = absint($_POST['limit'] ?? 12);
+        $offset   = absint($_POST['offset'] ?? 0);
         $category = sanitize_text_field($_POST['category'] ?? '');
-        $search = sanitize_text_field($_POST['search'] ?? '');
-        $source = sanitize_text_field($_POST['source'] ?? 'all');
-        
+        $search   = sanitize_text_field($_POST['search'] ?? '');
+        $source   = sanitize_text_field($_POST['source'] ?? 'all');
+
+        // Always fetch one extra record so we can detect "has more"
+        $need_count = $offset + $limit + 1;
+
         $api_manager = new AI_Events_API_Manager();
-        
-        // Try to get cached events first
+
+        // Try cache first
         $events = $api_manager->get_cached_events($location);
-        
-        if (empty($events)) {
-            // Get fresh events from APIs
-            $events = $api_manager->get_events($location, $radius, $limit + $offset);
-            
-            // Cache the events
-            if (!empty($events)) {
+
+        // If no cache or cache has fewer items than we need to answer this page, fetch fresh
+        if (empty($events) || count($events) < $need_count) {
+            $fetched = $api_manager->get_events($location, $radius, $need_count);
+            if (!empty($fetched)) {
+                $events = $fetched;
+                // Replace/refresh cache so subsequent pages can be served without refetch
                 $api_manager->cache_events($events, $location);
             }
         }
-        
-        // Apply filters
-        if (!empty($category) && $category !== 'all') {
-            $events = array_filter($events, function($event) use ($category) {
-                return stripos($event['category'], $category) !== false
-                    || (!empty($event['ai_category']) && stripos($event['ai_category'], $category) !== false);
-            });
+
+        // If still empty, bail early
+        if (empty($events)) {
+            wp_send_json_error(__('No events found.', 'ai-events-pro'));
         }
-        
-        if (!empty($search)) {
-            $events = array_filter($events, function($event) use ($search) {
-                return stripos($event['title'], $search) !== false || 
-                       stripos($event['description'], $search) !== false;
-            });
-        }
-        
-        if (!empty($source) && $source !== 'all') {
-            $events = array_filter($events, function($event) use ($source) {
-                return $event['source'] === $source;
-            });
-        }
-        
-        // Apply AI enhancements if enabled and configured
+
+        // Apply filters on the full list we have so far
+        $filtered = array_values(array_filter($events, function ($event) use ($category, $search, $source) {
+
+            // Source filter
+            if (!empty($source) && $source !== 'all') {
+                if (!isset($event['source']) || strtolower($event['source']) !== strtolower($source)) {
+                    return false;
+                }
+            }
+
+            // Category filter (check both category and ai_category if present)
+            if (!empty($category) && $category !== 'all') {
+                $cat1 = isset($event['category']) ? (string)$event['category'] : '';
+                $cat2 = isset($event['ai_category']) ? (string)$event['ai_category'] : '';
+                if (stripos($cat1, $category) === false && stripos($cat2, $category) === false) {
+                    return false;
+                }
+            }
+
+            // Search filter (title + description)
+            if (!empty($search)) {
+                $title = isset($event['title']) ? (string)$event['title'] : '';
+                $desc  = isset($event['description']) ? (string)$event['description'] : '';
+                if (stripos($title, $search) === false && stripos($desc, $search) === false) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+
+        // Optionally enhance with AI on the filtered slice we know about
         $ai_settings = get_option('ai_events_pro_ai_settings', array());
         if (!empty($ai_settings['enable_ai_features']) && !empty($ai_settings['openrouter_api_key'])) {
-            $events = $api_manager->enhance_with_ai($events, $ai_settings);
+            $filtered = $api_manager->enhance_with_ai($filtered, $ai_settings);
         }
-        
-        // Paginate results
-        $total_events = count($events);
-        $events = array_slice(array_values($events), $offset, $limit);
-        
-        if (!empty($events)) {
+
+        // Total filtered events we currently know about (within what we fetched/cached)
+        $total_filtered = count($filtered);
+
+        // Slice for current page
+        $page_events = array_slice($filtered, $offset, $limit);
+
+        if (!empty($page_events)) {
             ob_start();
-            foreach ($events as $event) {
+            foreach ($page_events as $event) {
                 include AI_EVENTS_PRO_PLUGIN_DIR . 'public/partials/event-card.php';
             }
             $html = ob_get_clean();
-            
+
+            // We fetched one extra, so "has more" is true if our filtered total exceeds the end of this page.
+            $has_more = ($offset + $limit) < $total_filtered;
+
             wp_send_json_success(array(
-                'html' => $html,
-                'total' => $total_events,
-                'has_more' => ($offset + $limit) < $total_events
+                'html'     => $html,
+                'total'    => $total_filtered,
+                'has_more' => $has_more,
             ));
         } else {
             wp_send_json_error(__('No events found.', 'ai-events-pro'));
@@ -160,16 +220,16 @@ class AI_Events_Public {
 
     public function ajax_toggle_theme_mode() {
         check_ajax_referer('ai_events_public_nonce', 'nonce');
-        
+
         $mode = sanitize_text_field($_POST['mode'] ?? 'auto');
-        
-        if (!in_array($mode, array('light', 'dark', 'auto'))) {
+
+        if (!in_array($mode, array('light', 'dark', 'auto'), true)) {
             wp_send_json_error(__('Invalid theme mode.', 'ai-events-pro'));
         }
-        
+
         // Store preference in cookie (30 days)
-        setcookie('ai_events_theme_mode', $mode, time() + (30 * 24 * 60 * 60), '/');
-        
+        setcookie('ai_events_theme_mode', $mode, time() + (30 * DAY_IN_SECONDS), '/');
+
         wp_send_json_success(array('mode' => $mode));
     }
 
@@ -213,7 +273,7 @@ class AI_Events_Public {
         if (empty($ip) && !empty($_SERVER['REMOTE_ADDR'])) {
             $ip = $_SERVER['REMOTE_ADDR'];
         }
-        
+
         return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '';
     }
 
@@ -260,11 +320,11 @@ class AI_Events_Public {
             'eventStatus' => 'https://schema.org/EventScheduled',
             'eventAttendanceMode' => 'https://schema.org/OfflineEventAttendanceMode'
         );
-        
+
         if (!empty($event['image'])) {
             $schema['image'] = $event['image'];
         }
-        
+
         if (!empty($event['venue']) || !empty($event['location'])) {
             $schema['location'] = array(
                 '@type' => 'Place',
@@ -272,14 +332,14 @@ class AI_Events_Public {
                 'address' => $event['location']
             );
         }
-        
+
         if (!empty($event['organizer'])) {
             $schema['organizer'] = array(
                 '@type' => 'Organization',
                 'name' => $event['organizer']
             );
         }
-        
+
         if (!empty($event['price']) && $event['price'] !== 'Free') {
             // Try to derive currency from price string (e.g., "USD 10.00 - 20.00")
             $currency = 'USD';
@@ -294,7 +354,7 @@ class AI_Events_Public {
                 'availability' => 'https://schema.org/InStock'
             );
         }
-        
+
         echo '<script type="application/ld+json">' . wp_json_encode($schema) . '</script>';
     }
 }
